@@ -1,0 +1,8 @@
+{
+  "name": "unmatched-ego-web",
+  "private": true,
+  "scripts": {
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server exec tsx watch src/index.ts"
+  }
+}
