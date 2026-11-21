@@ -71,7 +71,7 @@ const SKILL_KEYS = ["Z", "X", "C"];
 
 // ─── SCENE / RENDERER ───────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // cap DPR
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -97,7 +97,7 @@ scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(10, 30, 10);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024); // reduced from 2048
+sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 150;
 sun.shadow.camera.left = -60;
@@ -171,12 +171,12 @@ makeWall(0.5, wallH, PITCH_D, hw, wallH / 2, 0);
 
 // ─── GOALS ──────────────────────────────────────────────────────────────────
 const GOAL_W = 7.32, GOAL_H = 2.44, GOAL_D = 2;
-const goalMat  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.7 });
-const goalPost = new THREE.CylinderGeometry(0.06, 0.06, GOAL_H, 8);
-const goalBar  = new THREE.CylinderGeometry(0.06, 0.06, GOAL_W, 8);
+const goalMat       = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.7 });
+const goalPost      = new THREE.CylinderGeometry(0.06, 0.06, GOAL_H, 8);
+const goalBar       = new THREE.CylinderGeometry(0.06, 0.06, GOAL_W, 8);
 const goalNetGeo    = new THREE.PlaneGeometry(GOAL_W, GOAL_H);
 const goalTopNetGeo = new THREE.PlaneGeometry(GOAL_D, GOAL_W);
-const netMatBase = new THREE.MeshStandardMaterial({
+const netMatBase    = new THREE.MeshStandardMaterial({
   color: 0xffffff, transparent: true, opacity: 0.15, side: THREE.DoubleSide,
 });
 
@@ -207,9 +207,9 @@ buildGoal(1);
 
 // ─── RAPIER PHYSICS ─────────────────────────────────────────────────────────
 await RAPIER.init();
-const world = new RAPIER.World({ x: 0, y: -20, z: 0 });
+// Stronger gravity keeps jumps crisp and short without feeling floaty
+const world = new RAPIER.World({ x: 0, y: -28, z: 0 });
 
-// Fixed physics timestep
 const FIXED_DT = 1 / 60;
 let physicsAccum = 0;
 
@@ -238,7 +238,6 @@ const ballMesh = new THREE.Mesh(
 ballMesh.castShadow = true;
 scene.add(ballMesh);
 
-// Ball trail
 const TRAIL_LEN = 30;
 const trailPositions = new Float32Array(TRAIL_LEN * 3);
 const trailGeo = new THREE.BufferGeometry();
@@ -282,7 +281,6 @@ const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00f
   playerMesh.add(eye);
 });
 
-// Shared awakening geometry/materials (created once)
 const auraMat = new THREE.MeshBasicMaterial({
   color: 0xff2244, transparent: true, opacity: 0.25, toneMapped: false,
   side: THREE.DoubleSide, depthWrite: false,
@@ -391,7 +389,7 @@ function handlePlaystyleKeys() {
   });
 }
 
-// ─── SKILL PANEL (rebuild on playstyle change only) ─────────────────────────
+// ─── SKILL PANEL ────────────────────────────────────────────────────────────
 function buildSkillPanel() {
   const equipped = equippedSkills();
   skillPanel.innerHTML = equipped.map((skill, i) => `
@@ -406,7 +404,6 @@ function buildSkillPanel() {
     </div>`).join("");
 }
 
-// Cache skill panel element refs after each rebuild
 let skillCdEls:   (HTMLElement | null)[] = [];
 let skillFillEls: (HTMLElement | null)[] = [];
 function cacheSkillPanelEls() {
@@ -414,7 +411,6 @@ function cacheSkillPanelEls() {
   skillFillEls = [0, 1, 2].map(i => document.getElementById(`skill-cd-fill-${i}`));
 }
 
-// Throttle skill panel: only write DOM when values cross meaningful thresholds
 const prevSkillCdText: string[] = ["", "", ""];
 const prevSkillFillH:  string[] = ["", "", ""];
 
@@ -435,23 +431,15 @@ function updateSkillPanel() {
       color = lowStam ? "#f55" : "#0ff";
       fillH = "0%";
     }
-    if (prevSkillCdText[i] !== text) {
-      cdEl.textContent = text;
-      cdEl.style.color = color;
-      prevSkillCdText[i] = text;
-    }
-    if (prevSkillFillH[i] !== fillH) {
-      fillEl.style.height = fillH;
-      prevSkillFillH[i] = fillH;
-    }
+    if (prevSkillCdText[i] !== text) { cdEl.textContent = text; cdEl.style.color = color; prevSkillCdText[i] = text; }
+    if (prevSkillFillH[i] !== fillH) { fillEl.style.height = fillH; prevSkillFillH[i] = fillH; }
   });
 }
 
-// ─── SKILL VFX (pool ring geometry/material) ─────────────────────────────────
+// ─── SKILL VFX (pooled) ──────────────────────────────────────────────────────
 const VFX_GEO = new THREE.RingGeometry(0.4, 0.65, 40);
 interface SkillVfx { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; life: number; maxLife: number; }
 const skillVfx: SkillVfx[] = [];
-// Pool of inactive meshes to reuse
 const vfxPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
 
 function acquireVfxMesh(color: number): { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial } {
@@ -487,11 +475,7 @@ function updateSkillVfx(dt: number) {
     const v = skillVfx[i];
     v.life += dt;
     const t = v.life / v.maxLife;
-    if (t >= 1) {
-      releaseVfxMesh({ mesh: v.mesh, mat: v.mat });
-      skillVfx.splice(i, 1);
-      continue;
-    }
+    if (t >= 1) { releaseVfxMesh({ mesh: v.mesh, mat: v.mat }); skillVfx.splice(i, 1); continue; }
     const s = 1 + t * 6;
     v.mesh.scale.set(s, s, s);
     v.mat.opacity = 0.9 * (1 - t);
@@ -595,48 +579,31 @@ function updateAwakening(dt: number) {
   zoneRingMat.opacity = 0.35 + Math.sin(t * 0.005) * 0.2;
 }
 
-// ─── HUD (throttled dirty-flag updates) ─────────────────────────────────────
-// Only write to DOM when values change beyond a threshold
-const HUD_UPDATE_INTERVAL = 1 / 20; // 20 Hz cap for most HUD elements
+// ─── HUD (throttled) ─────────────────────────────────────────────────────────
+const HUD_UPDATE_INTERVAL = 1 / 20;
 let hudAccum = 0;
-
-const hudDirty = {
-  score: true, stam: true, shot: true, curve: true, playstyle: true, aw: true,
-};
-
-// Previous HUD values for change detection
-let prevScore      = "";
-let prevStamW      = "";
-let prevShotW      = "";
-let prevCurve      = "";
-let prevPsText     = "";
-let prevAwW        = "";
-let prevAwReadyVis = "";
-let prevAwLabelTxt = "";
+const hudDirty = { score: true, stam: true, shot: true, curve: true, playstyle: true, aw: true };
+let prevScore = "", prevStamW = "", prevShotW = "", prevCurve = "";
+let prevPsText = "", prevAwW = "", prevAwReadyVis = "", prevAwLabelTxt = "";
 
 function updateHUD(dt: number) {
   hudAccum += dt;
   if (hudAccum < HUD_UPDATE_INTERVAL) return;
   hudAccum = 0;
 
-  // Score
   const scoreStr = `${score[0]} — ${score[1]}`;
   if (scoreStr !== prevScore) { scoreEl.textContent = scoreStr; prevScore = scoreStr; }
 
-  // Stamina
   const stamW = `${stamina.toFixed(1)}%`;
   if (stamW !== prevStamW) { stamBar.style.width = stamW; prevStamW = stamW; }
 
-  // Shot
   const shotW = `${shotCharge.toFixed(1)}%`;
   if (shotW !== prevShotW) { shotBar.style.width = shotW; prevShotW = shotW; }
 
-  // Curve
   const curve = keys["KeyQ"] ? "◄ L" : keys["KeyE"] ? "R ►" : "NONE";
   const curveStr = `CURVE: ${curve}`;
   if (curveStr !== prevCurve) { curveInd.textContent = curveStr; prevCurve = curveStr; }
 
-  // Playstyle tag (only on playstyle change)
   if (hudDirty.playstyle) {
     const hex = PLAYSTYLE_HEX[currentPlaystyle];
     const psText = `${currentPlaystyle} <span style="opacity:.6;font-weight:normal;font-size:.7rem;">[1-4]</span>`;
@@ -649,7 +616,6 @@ function updateHUD(dt: number) {
     hudDirty.playstyle = false;
   }
 
-  // Awakening bar
   const awW = `${awakeningGauge.toFixed(1)}%`;
   if (awW !== prevAwW) { awBar.style.width = awW; prevAwW = awW; }
 
@@ -682,8 +648,14 @@ function checkGrounded() {
 }
 
 // ─── DRIBBLE / SHOT ─────────────────────────────────────────────────────────
-const DRIBBLE_DIST = 1.1, DRIBBLE_FORCE = 18, MAX_SHOT = 55;
-const _fwdVec = new THREE.Vector3(); // reusable
+const DRIBBLE_DIST   = 1.1;
+// Higher spring force + velocity damping for sticky turn tethering
+const DRIBBLE_FORCE  = 38;
+const DRIBBLE_POCKET = 0.72; // how far in front the ball is pocketed
+// Max shot ~40% lower: was 55, now 33
+const MAX_SHOT = 33;
+
+const _fwdVec = new THREE.Vector3();
 
 function dribbleAndShoot(dt: number) {
   const pp = playerBody.translation();
@@ -697,11 +669,23 @@ function dribbleAndShoot(dt: number) {
 
   if (dist < DRIBBLE_DIST && !isCharging) {
     _fwdVec.set(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const targetX = pp.x + _fwdVec.x * DRIBBLE_DIST * 0.7;
-    const targetZ = pp.z + _fwdVec.z * DRIBBLE_DIST * 0.7;
-    const fx = (targetX - bp.x) * DRIBBLE_FORCE;
-    const fz = (targetZ - bp.z) * DRIBBLE_FORCE;
-    ballBody.applyImpulse({ x: fx * dt, y: 0, z: fz * dt }, true);
+    const targetX = pp.x + _fwdVec.x * DRIBBLE_POCKET;
+    const targetZ = pp.z + _fwdVec.z * DRIBBLE_POCKET;
+
+    // Spring toward dribble pocket
+    const errX = targetX - bp.x;
+    const errZ = targetZ - bp.z;
+
+    // Velocity-match damping: pulls ball velocity toward player velocity on fast turns
+    const bv = ballBody.linvel();
+    const dampX = (pv.x - bv.x) * 6.0;
+    const dampZ = (pv.z - bv.z) * 6.0;
+
+    ballBody.applyImpulse({
+      x: (errX * DRIBBLE_FORCE + dampX) * dt,
+      y: 0,
+      z: (errZ * DRIBBLE_FORCE + dampZ) * dt,
+    }, true);
   }
 
   if (dribbling) addGauge(7 * dt);
@@ -717,8 +701,10 @@ function dribbleAndShoot(dt: number) {
     const spin = keys["KeyQ"] ? -1 : keys["KeyE"] ? 1 : 0;
     const skillCurve = skillBoost ? skillBoost.curve : 0;
 
+    // Same loft ratio — just lower absolute power
     ballBody.applyImpulse({ x: _fwdVec.x * power, y: power * 0.08, z: _fwdVec.z * power }, true);
 
+    // Magnus torque: same ratios preserved so curve is still noticeable at reduced power
     if (spin !== 0) {
       ballBody.applyTorqueImpulse({ x: 0, y: spin * power * (0.08 + skillCurve * 0.04), z: 0 }, true);
     } else if (skillCurve > 0) {
@@ -751,7 +737,6 @@ function applyMagnus() {
 
 // ─── PLAYER MOVEMENT ────────────────────────────────────────────────────────
 const SPEED_WALK = 7, SPEED_SPRINT = 12, SPEED_SLIDE = 20;
-const _moveVec = new THREE.Vector3();
 
 function movePlayer(dt: number) {
   const fwd   = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
@@ -793,17 +778,18 @@ function movePlayer(dt: number) {
     playerBody.setLinvel({ x: cv.x * 0.7, y: cv.y, z: cv.z * 0.7 }, true);
   }
 
+  // Jump halved (12 → 6); gravity raised to -28 so the arc is quick and grounded
   if (keys["Space"] && isGrounded) {
-    playerBody.applyImpulse({ x: 0, y: 12, z: 0 }, true);
+    playerBody.applyImpulse({ x: 0, y: 6, z: 0 }, true);
   }
 }
 
 // ─── CAMERA ─────────────────────────────────────────────────────────────────
-const camOffset = new THREE.Vector3(0, 2.5, 5.5);
-const _camPivot = new THREE.Vector3();
-const _camQYaw  = new THREE.Quaternion();
-const _camQPitch= new THREE.Quaternion();
-const _camEuler = new THREE.Euler();
+const camOffset  = new THREE.Vector3(0, 2.5, 5.5);
+const _camPivot  = new THREE.Vector3();
+const _camQYaw   = new THREE.Quaternion();
+const _camQPitch = new THREE.Quaternion();
+const _camEuler  = new THREE.Euler();
 
 function updateCamera() {
   const pp = playerBody.translation();
@@ -825,7 +811,6 @@ function updateTrail() {
   if (!last || last.x !== bp.x || last.y !== bp.y || last.z !== bp.z) {
     trailHistory.push(new THREE.Vector3(bp.x, bp.y, bp.z));
   }
-
   const attr = trailGeo.attributes["position"] as THREE.BufferAttribute;
   const len  = trailHistory.length;
   for (let i = 0; i < len; i++) {
@@ -856,7 +841,6 @@ function animate() {
 
   updateCooldowns(dt);
 
-  // Fixed-step physics accumulator
   physicsAccum += dt;
   while (physicsAccum >= FIXED_DT) {
     world.step();
@@ -871,7 +855,6 @@ function animate() {
   updateAwakening(dt);
   updateSkillVfx(dt);
 
-  // Sync meshes
   const pp = playerBody.translation();
   playerMesh.position.set(pp.x, pp.y, pp.z);
   playerMesh.rotation.y = yaw;
