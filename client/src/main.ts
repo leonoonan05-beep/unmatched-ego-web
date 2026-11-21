@@ -1,5 +1,12 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import {
+  PLAYSTYLES,
+  skillsForPlaystyle,
+  awakeningForPlaystyle,
+  type Playstyle,
+  type SkillConfig,
+} from "../../../shared/abilities";
 
 // ─── HUD ────────────────────────────────────────────────────────────────────
 const hud = document.createElement("div");
@@ -11,6 +18,10 @@ document.body.style.cssText = "margin:0;overflow:hidden;background:#000;";
 hud.innerHTML = `
 <div id="score" style="position:absolute;top:18px;left:50%;transform:translateX(-50%);
   font-size:2rem;font-weight:bold;letter-spacing:4px;text-shadow:0 0 12px #0ff,0 0 24px #0ff;">0 — 0</div>
+<div id="playstyle-tag" style="position:absolute;top:18px;left:24px;font-size:1rem;font-weight:bold;
+  letter-spacing:3px;padding:6px 14px;border:1px solid #0ff;border-radius:6px;background:rgba(0,0,0,.55);">
+  EGOIST <span style="opacity:.6;font-weight:normal;font-size:.7rem;">[1-4]</span>
+</div>
 <div style="position:absolute;bottom:40px;left:24px;width:160px;">
   <div style="font-size:.7rem;letter-spacing:2px;margin-bottom:3px;">STAMINA</div>
   <div style="background:rgba(0,0,0,.5);border:1px solid #0ff;height:10px;border-radius:4px;">
@@ -21,18 +32,42 @@ hud.innerHTML = `
     <div id="shot-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#f0a,#f50);border-radius:4px;transition:width .05s;"></div>
   </div>
   <div id="curve-ind" style="font-size:.8rem;letter-spacing:3px;margin-top:8px;color:#ff0;text-shadow:0 0 8px #ff0;">CURVE: NONE</div>
+  <div style="font-size:.7rem;letter-spacing:2px;margin-top:10px;margin-bottom:3px;">AWAKENING <span id="aw-key-hint" style="color:#0ff;">[R]</span></div>
+  <div style="background:rgba(0,0,0,.5);border:1px solid #f5f;height:10px;border-radius:4px;position:relative;">
+    <div id="aw-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#f0f,#f5f);border-radius:4px;transition:width .15s;"></div>
+    <div id="aw-ready" style="display:none;position:absolute;top:-2px;left:0;width:100%;text-align:center;font-size:.55rem;
+      letter-spacing:2px;color:#fff;text-shadow:0 0 8px #f5f,0 0 16px #f5f;">READY</div>
+  </div>
+  <div id="aw-label" style="font-size:.65rem;letter-spacing:2px;margin-top:3px;color:#f8f;opacity:.85;"></div>
 </div>
+<div id="skill-panel" style="position:absolute;bottom:40px;right:24px;display:flex;gap:8px;"></div>
+<div id="awaken-flash" style="position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);display:none;
+  font-size:1.6rem;font-weight:bold;letter-spacing:6px;color:#fff;text-shadow:0 0 16px #f5f,0 0 32px #f5f;"></div>
 <div id="lock-prompt" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   font-size:1.1rem;letter-spacing:2px;background:rgba(0,0,0,.6);padding:12px 24px;border:1px solid #0ff;border-radius:8px;">
   CLICK TO PLAY
 </div>`;
 document.body.appendChild(hud);
 
-const scoreEl    = document.getElementById("score")!;
-const stamBar    = document.getElementById("stam-bar")!;
-const shotBar    = document.getElementById("shot-bar")!;
-const curveInd   = document.getElementById("curve-ind")!;
-const lockPrompt = document.getElementById("lock-prompt")!;
+const scoreEl       = document.getElementById("score")!;
+const stamBar       = document.getElementById("stam-bar")!;
+const shotBar       = document.getElementById("shot-bar")!;
+const curveInd      = document.getElementById("curve-ind")!;
+const lockPrompt    = document.getElementById("lock-prompt")!;
+const playstyleTag  = document.getElementById("playstyle-tag")!;
+const skillPanel    = document.getElementById("skill-panel")!;
+const awBar         = document.getElementById("aw-bar")!;
+const awReady       = document.getElementById("aw-ready")!;
+const awLabel       = document.getElementById("aw-label")!;
+const awakenFlash   = document.getElementById("awaken-flash")!;
+
+const PLAYSTYLE_KEYS: Record<Playstyle, string> = {
+  EGOIST: "1", PLAYMAKER: "2", LOCKDOWN: "3", SPEEDSTER: "4",
+};
+const PLAYSTYLE_HEX: Record<Playstyle, string> = {
+  EGOIST: "#ff3355", PLAYMAKER: "#ffcc00", LOCKDOWN: "#00ff88", SPEEDSTER: "#00ccff",
+};
+const SKILL_KEYS = ["Z", "X", "C"];
 
 // ─── SCENE / RENDERER ───────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -258,6 +293,28 @@ const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00f
   playerMesh.add(eye);
 });
 
+// Awakening aura (sphere + light + zone ring)
+const auraMat = new THREE.MeshBasicMaterial({
+  color: 0xff2244, transparent: true, opacity: 0.25, toneMapped: false,
+  side: THREE.DoubleSide, depthWrite: false,
+});
+const auraMesh = new THREE.Mesh(new THREE.SphereGeometry(1.35, 24, 24), auraMat);
+auraMesh.visible = false;
+scene.add(auraMesh);
+
+const auraLight = new THREE.PointLight(0xff2244, 0, 14);
+auraLight.visible = false;
+scene.add(auraLight);
+
+const zoneRingMat = new THREE.MeshBasicMaterial({
+  color: 0xff2244, transparent: true, opacity: 0.5, toneMapped: false, side: THREE.DoubleSide,
+});
+const zoneRing = new THREE.Mesh(new THREE.RingGeometry(4.4, 4.7, 48), zoneRingMat);
+zoneRing.rotation.x = -Math.PI / 2;
+zoneRing.position.y = 0.04;
+zoneRing.visible = false;
+scene.add(zoneRing);
+
 const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
   .setTranslation(0, PLAYER_H / 2, 5)
   .lockRotations();
@@ -269,7 +326,11 @@ world.createCollider(
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
 const keys: Record<string, boolean> = {};
-window.addEventListener("keydown", e => { keys[e.code] = true; });
+const keyJustPressed: Record<string, boolean> = {};
+window.addEventListener("keydown", e => {
+  if (!keys[e.code]) keyJustPressed[e.code] = true;
+  keys[e.code] = true;
+});
 window.addEventListener("keyup",   e => { keys[e.code] = false; });
 
 let yaw = 0, pitch2 = 0;
@@ -309,12 +370,239 @@ let slideTimer = 0;         // cooldown frames remaining
 const SLIDE_COOLDOWN = 90;
 let isGrounded = false;
 
+// Playstyle / skills / awakening
+let currentPlaystyle: Playstyle = "EGOIST";
+const skillCooldowns = new Map<string, number>();          // id -> seconds remaining
+let skillBoost: { kickMult: number; curve: number; timer: number } | null = null;
+
+let awakeningGauge = 0;      // 0-100
+let isAwakened = false;
+let awakeningTimer = 0;      // seconds remaining
+let activeAwakeningName = "";
+
+const equippedSkills = (): SkillConfig[] => skillsForPlaystyle(currentPlaystyle).slice(0, 3);
+const activeAwakening = () => awakeningForPlaystyle(currentPlaystyle);
+
+// ─── PLAYSTYLE SWITCHING ────────────────────────────────────────────────────
+function switchPlaystyle(ps: Playstyle) {
+  currentPlaystyle = ps;
+  skillBoost = null;
+  // End awakening if the new playstyle lacks the active one
+  if (isAwakened && activeAwakening().name !== activeAwakeningName) {
+    endAwakening();
+  }
+  playerMat.color.set(ps === "EGOIST" ? 0x882233 :
+                      ps === "PLAYMAKER" ? 0x887722 :
+                      ps === "LOCKDOWN" ? 0x228855 : 0x227799);
+  playerMat.emissive.set(ps === "EGOIST" ? 0x330011 :
+                         ps === "PLAYMAKER" ? 0x332200 :
+                         ps === "LOCKDOWN" ? 0x003322 : 0x002233);
+  if (!isAwakened) {
+    auraMesh.visible = false;
+    auraLight.visible = false;
+    zoneRing.visible = false;
+  }
+  buildSkillPanel();
+}
+
+function handlePlaystyleKeys() {
+  (["Digit1", "Digit2", "Digit3", "Digit4"] as const).forEach((code, i) => {
+    if (keyJustPressed[code]) switchPlaystyle(PLAYSTYLES[i]);
+  });
+}
+
+// ─── SKILL SLOTS HUD ────────────────────────────────────────────────────────
+function buildSkillPanel() {
+  const equipped = equippedSkills();
+  skillPanel.innerHTML = equipped.map((skill, i) => `
+    <div id="skill-slot-${i}" style="width:110px;padding:8px;background:rgba(0,0,0,.55);
+      border:1px solid ${PLAYSTYLE_HEX[currentPlaystyle]};border-radius:8px;position:relative;overflow:hidden;">
+      <div style="font-size:.6rem;letter-spacing:1px;opacity:.75;">[${SKILL_KEYS[i]}] ${skill.staminaCost} ST</div>
+      <div id="skill-name-${i}" style="font-size:.75rem;font-weight:bold;letter-spacing:1px;margin-top:2px;
+        text-shadow:0 0 6px ${PLAYSTYLE_HEX[currentPlaystyle]};">${skill.name}</div>
+      <div id="skill-cd-${i}" style="font-size:.65rem;margin-top:3px;color:#0ff;">READY</div>
+      <div id="skill-cd-fill-${i}" style="position:absolute;left:0;bottom:0;width:100%;height:0%;
+        background:${PLAYSTYLE_HEX[currentPlaystyle]};opacity:.25;transition:height .1s;pointer-events:none;"></div>
+    </div>`).join("");
+}
+
+function updateSkillPanel() {
+  equippedSkills().forEach((skill, i) => {
+    const cdEl = document.getElementById(`skill-cd-${i}`);
+    const fillEl = document.getElementById(`skill-cd-fill-${i}`);
+    if (!cdEl || !fillEl) return;
+    const cd = skillCooldowns.get(skill.id) ?? 0;
+    if (cd > 0) {
+      cdEl.textContent = `${cd.toFixed(1)}s`;
+      cdEl.style.color = "#888";
+      fillEl.style.height = `${(cd / skill.cooldownSec) * 100}%`;
+    } else {
+      const lowStam = stamina < skill.staminaCost;
+      cdEl.textContent = lowStam ? "LOW ST" : "READY";
+      cdEl.style.color = lowStam ? "#f55" : "#0ff";
+      fillEl.style.height = "0%";
+    }
+  });
+}
+
+// ─── SKILL VFX ──────────────────────────────────────────────────────────────
+interface SkillVfx { mesh: THREE.Mesh; life: number; maxLife: number; }
+const skillVfx: SkillVfx[] = [];
+
+function spawnSkillVfx(color: number) {
+  const pp = playerBody.translation();
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.4, 0.65, 40),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, toneMapped: false, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(pp.x, 0.06, pp.z);
+  scene.add(ring);
+  skillVfx.push({ mesh: ring, life: 0, maxLife: 0.5 });
+}
+
+function updateSkillVfx(dt: number) {
+  for (let i = skillVfx.length - 1; i >= 0; i--) {
+    const v = skillVfx[i];
+    v.life += dt;
+    const t = v.life / v.maxLife;
+    if (t >= 1) {
+      scene.remove(v.mesh);
+      (v.mesh as THREE.Mesh).geometry.dispose();
+      ((v.mesh as THREE.Mesh).material as THREE.Material).dispose();
+      skillVfx.splice(i, 1);
+      continue;
+    }
+    const s = 1 + t * 6;
+    v.mesh.scale.set(s, s, s);
+    ((v.mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t);
+  }
+}
+
+// ─── SKILL TRIGGER ──────────────────────────────────────────────────────────
+function triggerSkill(slot: number) {
+  const skill = equippedSkills()[slot];
+  if (!skill) return;
+  if ((skillCooldowns.get(skill.id) ?? 0) > 0) return;
+  if (stamina < skill.staminaCost) return;
+  if (slideTimer > 0) return;
+
+  stamina -= skill.staminaCost;
+  skillCooldowns.set(skill.id, skill.cooldownSec);
+
+  // Dash impulse along facing direction
+  if (skill.dashImpulse > 0) {
+    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    playerBody.applyImpulse(
+      { x: fwd.x * skill.dashImpulse, y: 0, z: fwd.z * skill.dashImpulse }, true
+    );
+  }
+
+  // Kick / curve boost window (applies to the next kick within 2s)
+  skillBoost = { kickMult: skill.kickPowerMultiplier, curve: skill.curveStrength, timer: 2.0 };
+
+  spawnSkillVfx(skill.vfxColor);
+}
+
+function handleSkillKeys() {
+  if (!isLocked) return;
+  if (keyJustPressed["KeyZ"]) triggerSkill(0);
+  if (keyJustPressed["KeyX"]) triggerSkill(1);
+  if (keyJustPressed["KeyC"]) triggerSkill(2);
+}
+
+function updateCooldowns(dt: number) {
+  for (const [id, t] of skillCooldowns) {
+    const next = t - dt;
+    if (next <= 0) skillCooldowns.delete(id);
+    else skillCooldowns.set(id, next);
+  }
+  if (skillBoost) {
+    skillBoost.timer -= dt;
+    if (skillBoost.timer <= 0) skillBoost = null;
+  }
+}
+
+// ─── AWAKENING ──────────────────────────────────────────────────────────────
+function addGauge(amount: number) {
+  if (isAwakened) return;
+  awakeningGauge = Math.min(100, awakeningGauge + amount);
+}
+
+function tryAwaken() {
+  if (!isAwakened && awakeningGauge >= 100) {
+    const aw = activeAwakening();
+    isAwakened = true;
+    awakeningTimer = aw.durationSec;
+    activeAwakeningName = aw.name;
+
+    auraMat.color.set(aw.auraColor);
+    auraLight.color.set(aw.auraColor);
+    zoneRingMat.color.set(aw.auraColor);
+    auraMesh.visible = true;
+    auraLight.visible = true;
+    zoneRing.visible = true;
+
+    awakenFlash.textContent = `AWAKENING — ${aw.name.toUpperCase()}`;
+    awakenFlash.style.display = "block";
+    setTimeout(() => { awakenFlash.style.display = "none"; }, 1800);
+  }
+}
+
+function endAwakening() {
+  isAwakened = false;
+  awakeningTimer = 0;
+  awakeningGauge = 0;
+  activeAwakeningName = "";
+  auraMesh.visible = false;
+  auraLight.visible = false;
+  zoneRing.visible = false;
+}
+
+function updateAwakening(dt: number) {
+  if (isAwakened) {
+    awakeningTimer -= dt;
+    // Gauge drains visually with remaining duration
+    const aw = activeAwakening();
+    awakeningGauge = Math.max(0, (awakeningTimer / aw.durationSec) * 100);
+    if (awakeningTimer <= 0) endAwakening();
+
+    // Pulse aura
+    const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.12;
+    const pp = playerBody.translation();
+    auraMesh.position.set(pp.x, pp.y, pp.z);
+    auraMesh.scale.setScalar(pulse);
+    auraLight.position.set(pp.x, pp.y + 0.5, pp.z);
+    auraLight.intensity = 2.5 + Math.sin(performance.now() * 0.008) * 1.2;
+    zoneRing.position.set(pp.x, 0.04, pp.z);
+    const rp = 1 + Math.sin(performance.now() * 0.005) * 0.04;
+    zoneRing.scale.set(rp, rp, 1);
+    zoneRingMat.opacity = 0.35 + Math.sin(performance.now() * 0.005) * 0.2;
+  }
+}
+
+// ─── HUD ────────────────────────────────────────────────────────────────────
 function updateHUD() {
   scoreEl.textContent = `${score[0]} — ${score[1]}`;
   (stamBar as HTMLElement).style.width = `${stamina}%`;
   (shotBar as HTMLElement).style.width = `${shotCharge}%`;
   const curve = keys["KeyQ"] ? "◄ L" : keys["KeyE"] ? "R ►" : "NONE";
   curveInd.textContent = `CURVE: ${curve}`;
+
+  playstyleTag.innerHTML =
+    `${currentPlaystyle} <span style="opacity:.6;font-weight:normal;font-size:.7rem;">[1-4]</span>`;
+  playstyleTag.style.borderColor = PLAYSTYLE_HEX[currentPlaystyle];
+  playstyleTag.style.textShadow = `0 0 10px ${PLAYSTYLE_HEX[currentPlaystyle]}`;
+
+  (awBar as HTMLElement).style.width = `${awakeningGauge}%`;
+  awReady.style.display = !isAwakened && awakeningGauge >= 100 ? "block" : "none";
+  awLabel.textContent = isAwakened
+    ? `${activeAwakeningName.toUpperCase()} ${awakeningTimer.toFixed(1)}s`
+    : awakeningGauge >= 100
+      ? "PRESS R"
+      : `GAUGE ${Math.floor(awakeningGauge)}%`;
+
+  updateSkillPanel();
 }
 
 // ─── GOAL DETECTION ─────────────────────────────────────────────────────────
@@ -339,12 +627,17 @@ function checkGrounded() {
 const DRIBBLE_DIST = 1.1;
 const DRIBBLE_FORCE = 18;
 const MAX_SHOT = 55;
+let wasDribbling = false;
 
 function dribbleAndShoot(dt: number) {
   const pp = playerBody.translation();
   const bp = ballBody.translation();
   const dx = bp.x - pp.x, dz = bp.z - pp.z;
   const dist = Math.sqrt(dx * dx + dz * dz);
+
+  const pv = playerBody.linvel();
+  const playerSpeed = Math.sqrt(pv.x * pv.x + pv.z * pv.z);
+  const dribbling = dist < DRIBBLE_DIST && !isCharging && playerSpeed > 1.5;
 
   // Magnetic dribble
   if (dist < DRIBBLE_DIST && !isCharging) {
@@ -357,22 +650,37 @@ function dribbleAndShoot(dt: number) {
     ballBody.applyImpulse({ x: fx * dt, y: 0, z: fz * dt }, true);
   }
 
+  // Awakening gauge: dribble progress
+  if (dribbling) addGauge(7 * dt);
+  wasDribbling = dribbling;
+
   // Charge shot
   if (mouseLeft && dist < DRIBBLE_DIST * 1.5 && isLocked) {
     isCharging = true;
     shotCharge = Math.min(100, shotCharge + 60 * dt);
   } else if (isCharging && !mouseLeft) {
     // Release shot
-    const power = (shotCharge / 100) * MAX_SHOT;
+    const boostMult = skillBoost ? skillBoost.kickMult : 1;
+    const awakenMult = isAwakened ? activeAwakening().shotPowerMultiplier : 1;
+    const power = (shotCharge / 100) * MAX_SHOT * boostMult * awakenMult;
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
     const spin = keys["KeyQ"] ? -1 : keys["KeyE"] ? 1 : 0;
+    const skillCurve = skillBoost ? skillBoost.curve : 0;
 
     ballBody.applyImpulse({ x: fwd.x * power, y: power * 0.08, z: fwd.z * power }, true);
 
     // Magnus spin torque
     if (spin !== 0) {
-      ballBody.applyTorqueImpulse({ x: 0, y: spin * power * 0.08, z: 0 }, true);
+      ballBody.applyTorqueImpulse(
+        { x: 0, y: spin * power * (0.08 + skillCurve * 0.04), z: 0 }, true
+      );
+    } else if (skillCurve > 0) {
+      ballBody.applyTorqueImpulse({ x: 0, y: skillCurve * power * 0.05, z: 0 }, true);
     }
+
+    // Awakening gauge: shots taken (scaled by charge)
+    addGauge(8 + shotCharge * 0.1);
+    skillBoost = null;   // boost is consumed by the kick
     shotCharge = 0;
     isCharging = false;
   } else if (!mouseLeft) {
@@ -409,8 +717,11 @@ function movePlayer(dt: number) {
   if (keys["KeyA"]) { mx -= right.x; mz -= right.z; }
   if (keys["KeyD"]) { mx += right.x; mz += right.z; }
 
+  const awakenSpeed = isAwakened ? activeAwakening().speedMultiplier : 1;
   const sprinting = keys["ShiftLeft"] && stamina > 0 && (Math.abs(mx) + Math.abs(mz) > 0);
-  const speed = slideTimer > 0 ? SPEED_SLIDE : sprinting ? SPEED_SPRINT : SPEED_WALK;
+  const baseSpeed = slideTimer > 0 ? SPEED_SLIDE
+                  : sprinting ? SPEED_SPRINT : SPEED_WALK;
+  const speed = baseSpeed * awakenSpeed;
 
   if (sprinting) stamina = Math.max(0, stamina - 25 * dt);
   else           stamina = Math.min(100, stamina + 15 * dt);
@@ -420,6 +731,13 @@ function movePlayer(dt: number) {
     slideTimer = SLIDE_COOLDOWN;
     const impulse = SPEED_SLIDE * 1.5;
     playerBody.applyImpulse({ x: fwd.x * impulse, y: 0, z: fwd.z * impulse }, true);
+
+    // Awakening gauge: tackle attempt + bonus if ball is won
+    addGauge(6);
+    const pp = playerBody.translation();
+    const bp = ballBody.translation();
+    const tackleDist = Math.hypot(bp.x - pp.x, bp.z - pp.z);
+    if (tackleDist < 3.0) addGauge(14);   // successful tackle
   }
   if (slideTimer > 0) { slideTimer--; return; }
 
@@ -467,6 +785,7 @@ function updateTrail() {
 }
 
 // ─── MAIN LOOP ──────────────────────────────────────────────────────────────
+buildSkillPanel();
 let lastTime = performance.now();
 
 function animate() {
@@ -475,6 +794,13 @@ function animate() {
   const dt  = Math.min((now - lastTime) / 1000, 0.05);
   lastTime  = now;
 
+  handlePlaystyleKeys();
+  handleSkillKeys();
+  if (keyJustPressed["KeyR"]) tryAwaken();
+  for (const k of Object.keys(keyJustPressed)) keyJustPressed[k] = false;
+
+  updateCooldowns(dt);
+
   world.step();
 
   checkGrounded();
@@ -482,6 +808,8 @@ function animate() {
   dribbleAndShoot(dt);
   applyMagnus();
   checkGoal();
+  updateAwakening(dt);
+  updateSkillVfx(dt);
 
   // Sync meshes
   const pp = playerBody.translation();
