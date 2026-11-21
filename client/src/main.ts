@@ -6,7 +6,7 @@ import {
   awakeningForPlaystyle,
   type Playstyle,
   type SkillConfig,
-} from "../../../shared/abilities";
+} from "../../shared/abilities";
 
 // ─── HUD ────────────────────────────────────────────────────────────────────
 const hud = document.createElement("div");
@@ -49,17 +49,17 @@ hud.innerHTML = `
 </div>`;
 document.body.appendChild(hud);
 
-const scoreEl       = document.getElementById("score")!;
-const stamBar       = document.getElementById("stam-bar")!;
-const shotBar       = document.getElementById("shot-bar")!;
-const curveInd      = document.getElementById("curve-ind")!;
-const lockPrompt    = document.getElementById("lock-prompt")!;
-const playstyleTag  = document.getElementById("playstyle-tag")!;
-const skillPanel    = document.getElementById("skill-panel")!;
-const awBar         = document.getElementById("aw-bar")!;
-const awReady       = document.getElementById("aw-ready")!;
-const awLabel       = document.getElementById("aw-label")!;
-const awakenFlash   = document.getElementById("awaken-flash")!;
+const scoreEl      = document.getElementById("score")!;
+const stamBar      = document.getElementById("stam-bar")! as HTMLElement;
+const shotBar      = document.getElementById("shot-bar")! as HTMLElement;
+const curveInd     = document.getElementById("curve-ind")!;
+const lockPrompt   = document.getElementById("lock-prompt")!;
+const playstyleTag = document.getElementById("playstyle-tag")!;
+const skillPanel   = document.getElementById("skill-panel")!;
+const awBar        = document.getElementById("aw-bar")! as HTMLElement;
+const awReady      = document.getElementById("aw-ready")! as HTMLElement;
+const awLabel      = document.getElementById("aw-label")!;
+const awakenFlash  = document.getElementById("awaken-flash")!;
 
 const PLAYSTYLE_KEYS: Record<Playstyle, string> = {
   EGOIST: "1", PLAYMAKER: "2", LOCKDOWN: "3", SPEEDSTER: "4",
@@ -71,7 +71,7 @@ const SKILL_KEYS = ["Z", "X", "C"];
 
 // ─── SCENE / RENDERER ───────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // cap DPR
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -97,7 +97,7 @@ scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(10, 30, 10);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024); // reduced from 2048
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 150;
 sun.shadow.camera.left = -60;
@@ -106,7 +106,6 @@ sun.shadow.camera.top = 60;
 sun.shadow.camera.bottom = -60;
 scene.add(sun);
 
-// Stadium flood lights
 const floodColors = [0x00ffff, 0xff00aa, 0x00ffff, 0xff00aa];
 const floodPositions = [[-30, 20, -20], [30, 20, -20], [-30, 20, 20], [30, 20, 20]] as const;
 floodPositions.forEach(([x, y, z], i) => {
@@ -118,31 +117,28 @@ floodPositions.forEach(([x, y, z], i) => {
 // ─── PITCH ──────────────────────────────────────────────────────────────────
 const PITCH_W = 52, PITCH_H = 0.3, PITCH_D = 34;
 
-const pitchGeo = new THREE.BoxGeometry(PITCH_W, PITCH_H, PITCH_D);
-const pitchMat = new THREE.MeshStandardMaterial({ color: 0x1a4a1a, roughness: 0.9, metalness: 0 });
-const pitchMesh = new THREE.Mesh(pitchGeo, pitchMat);
+const pitchMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(PITCH_W, PITCH_H, PITCH_D),
+  new THREE.MeshStandardMaterial({ color: 0x1a4a1a, roughness: 0.9, metalness: 0 })
+);
 pitchMesh.receiveShadow = true;
 pitchMesh.position.y = -PITCH_H / 2;
 scene.add(pitchMesh);
 
-// Glowing pitch lines
 function makeLine(points: THREE.Vector3[], color = 0x00ffff) {
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   const mat = new THREE.LineBasicMaterial({ color, toneMapped: false });
-  (mat as THREE.LineBasicMaterial & { emissive?: THREE.Color }).color.multiplyScalar(2);
+  mat.color.multiplyScalar(2);
   const line = new THREE.Line(geo, mat);
   line.position.y = 0.02;
   scene.add(line);
 }
 
 const hw = PITCH_W / 2, hd = PITCH_D / 2;
-// Boundary
 makeLine([new THREE.Vector3(-hw, 0, -hd), new THREE.Vector3(hw, 0, -hd),
-           new THREE.Vector3(hw, 0, hd),  new THREE.Vector3(-hw, 0, hd),
-           new THREE.Vector3(-hw, 0, -hd)]);
-// Center line
+          new THREE.Vector3(hw, 0, hd),   new THREE.Vector3(-hw, 0, hd),
+          new THREE.Vector3(-hw, 0, -hd)]);
 makeLine([new THREE.Vector3(0, 0, -hd), new THREE.Vector3(0, 0, hd)]);
-// Center circle
 {
   const pts: THREE.Vector3[] = [];
   for (let i = 0; i <= 64; i++) {
@@ -151,62 +147,56 @@ makeLine([new THREE.Vector3(0, 0, -hd), new THREE.Vector3(0, 0, hd)]);
   }
   makeLine(pts);
 }
-// Penalty boxes
 [-1, 1].forEach(side => {
   const bx = side * (hw - 11), bz = 10;
   makeLine([new THREE.Vector3(side * hw, 0, -bz), new THREE.Vector3(bx, 0, -bz),
-             new THREE.Vector3(bx, 0, bz),         new THREE.Vector3(side * hw, 0, bz)]);
+            new THREE.Vector3(bx, 0, bz),          new THREE.Vector3(side * hw, 0, bz)]);
 });
 
 // ─── WALLS ──────────────────────────────────────────────────────────────────
+const wallMat = new THREE.MeshStandardMaterial({
+  color: 0x223355, roughness: 0.5, metalness: 0.3, transparent: true, opacity: 0.5,
+});
 function makeWall(w: number, h: number, d: number, x: number, y: number, z: number) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x223355, roughness: 0.5, metalness: 0.3,
-    transparent: true, opacity: 0.5,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
   mesh.position.set(x, y, z);
   mesh.receiveShadow = true;
   scene.add(mesh);
 }
-
 const wallH = 6;
-makeWall(PITCH_W, wallH, 0.5, 0, wallH / 2, -hd);   // back
-makeWall(PITCH_W, wallH, 0.5, 0, wallH / 2, hd);    // front
-makeWall(0.5, wallH, PITCH_D, -hw, wallH / 2, 0);   // left
-makeWall(0.5, wallH, PITCH_D, hw, wallH / 2, 0);    // right
+makeWall(PITCH_W, wallH, 0.5, 0, wallH / 2, -hd);
+makeWall(PITCH_W, wallH, 0.5, 0, wallH / 2, hd);
+makeWall(0.5, wallH, PITCH_D, -hw, wallH / 2, 0);
+makeWall(0.5, wallH, PITCH_D, hw, wallH / 2, 0);
 
 // ─── GOALS ──────────────────────────────────────────────────────────────────
 const GOAL_W = 7.32, GOAL_H = 2.44, GOAL_D = 2;
-const goalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.7 });
+const goalMat  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.7 });
+const goalPost = new THREE.CylinderGeometry(0.06, 0.06, GOAL_H, 8);
+const goalBar  = new THREE.CylinderGeometry(0.06, 0.06, GOAL_W, 8);
+const goalNetGeo    = new THREE.PlaneGeometry(GOAL_W, GOAL_H);
+const goalTopNetGeo = new THREE.PlaneGeometry(GOAL_D, GOAL_W);
+const netMatBase = new THREE.MeshStandardMaterial({
+  color: 0xffffff, transparent: true, opacity: 0.15, side: THREE.DoubleSide,
+});
 
 function buildGoal(side: number) {
   const gx = side * (hw + GOAL_D / 2);
-  // Posts
   [-GOAL_W / 2, GOAL_W / 2].forEach(zo => {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, GOAL_H, 8), goalMat);
+    const post = new THREE.Mesh(goalPost, goalMat);
     post.position.set(gx, GOAL_H / 2, zo);
     post.castShadow = true;
     scene.add(post);
   });
-  // Crossbar
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, GOAL_W, 8), goalMat);
+  const bar = new THREE.Mesh(goalBar, goalMat);
   bar.rotation.z = Math.PI / 2;
   bar.position.set(gx, GOAL_H, 0);
   scene.add(bar);
-  // Net (semi-transparent plane)
-  const netGeo = new THREE.PlaneGeometry(GOAL_W, GOAL_H);
-  const netMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.15,
-    side: THREE.DoubleSide, wireframe: false,
-  });
-  const net = new THREE.Mesh(netGeo, netMat);
+  const net = new THREE.Mesh(goalNetGeo, netMatBase);
   net.position.set(gx + side * GOAL_D / 2, GOAL_H / 2, 0);
   net.rotation.y = Math.PI / 2;
   scene.add(net);
-  // Top net
-  const topNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_D, GOAL_W), netMat.clone());
+  const topNet = new THREE.Mesh(goalTopNetGeo, netMatBase);
   topNet.position.set(gx + side * GOAL_D / 2, GOAL_H, 0);
   topNet.rotation.x = Math.PI / 2;
   topNet.rotation.z = Math.PI / 2;
@@ -219,6 +209,10 @@ buildGoal(1);
 await RAPIER.init();
 const world = new RAPIER.World({ x: 0, y: -20, z: 0 });
 
+// Fixed physics timestep
+const FIXED_DT = 1 / 60;
+let physicsAccum = 0;
+
 function makeStaticBox(hx: number, hy: number, hz: number, x: number, y: number, z: number) {
   const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
   const body = world.createRigidBody(desc);
@@ -226,9 +220,7 @@ function makeStaticBox(hx: number, hy: number, hz: number, x: number, y: number,
   return body;
 }
 
-// Ground
 makeStaticBox(PITCH_W / 2, PITCH_H / 2, PITCH_D / 2, 0, -PITCH_H / 2, 0);
-// Walls
 makeStaticBox(PITCH_W / 2, wallH / 2, 0.25, 0, wallH / 2, -hd);
 makeStaticBox(PITCH_W / 2, wallH / 2, 0.25, 0, wallH / 2, hd);
 makeStaticBox(0.25, wallH / 2, PITCH_D / 2, -hw, wallH / 2, 0);
@@ -236,12 +228,13 @@ makeStaticBox(0.25, wallH / 2, PITCH_D / 2, hw, wallH / 2, 0);
 
 // ─── BALL ───────────────────────────────────────────────────────────────────
 const BALL_R = 0.22;
-const ballGeo = new THREE.SphereGeometry(BALL_R, 16, 16);
-const ballMat = new THREE.MeshStandardMaterial({
-  color: 0xffffff, emissive: 0x00aaff, emissiveIntensity: 0.4,
-  roughness: 0.3, metalness: 0.1,
-});
-const ballMesh = new THREE.Mesh(ballGeo, ballMat);
+const ballMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(BALL_R, 16, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff, emissive: 0x00aaff, emissiveIntensity: 0.4,
+    roughness: 0.3, metalness: 0.1,
+  })
+);
 ballMesh.castShadow = true;
 scene.add(ballMesh);
 
@@ -250,21 +243,17 @@ const TRAIL_LEN = 30;
 const trailPositions = new Float32Array(TRAIL_LEN * 3);
 const trailGeo = new THREE.BufferGeometry();
 trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
-const trailMat = new THREE.LineBasicMaterial({
-  color: 0x00ccff, transparent: true, opacity: 0.6, toneMapped: false,
-});
-const trailLine = new THREE.Line(trailGeo, trailMat);
+const trailLine = new THREE.Line(trailGeo,
+  new THREE.LineBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.6, toneMapped: false })
+);
 scene.add(trailLine);
 const trailHistory: THREE.Vector3[] = [];
 
 const ballBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-  .setTranslation(0, 1, 0)
-  .setLinearDamping(0.5)
-  .setAngularDamping(0.4);
+  .setTranslation(0, 1, 0).setLinearDamping(0.5).setAngularDamping(0.4);
 const ballBody = world.createRigidBody(ballBodyDesc);
 const ballCollider = world.createCollider(
-  RAPIER.ColliderDesc.ball(BALL_R).setRestitution(0.6).setFriction(0.4),
-  ballBody
+  RAPIER.ColliderDesc.ball(BALL_R).setRestitution(0.6).setFriction(0.4), ballBody
 );
 void ballCollider;
 
@@ -276,15 +265,15 @@ function resetBall(x = 0, z = 0) {
 
 // ─── PLAYER ─────────────────────────────────────────────────────────────────
 const PLAYER_H = 1.8, PLAYER_R = 0.35;
-const playerGeo = new THREE.CapsuleGeometry(PLAYER_R, PLAYER_H - PLAYER_R * 2, 8, 16);
 const playerMat = new THREE.MeshStandardMaterial({
   color: 0x224488, emissive: 0x001133, roughness: 0.5, metalness: 0.3,
 });
-const playerMesh = new THREE.Mesh(playerGeo, playerMat);
+const playerMesh = new THREE.Mesh(
+  new THREE.CapsuleGeometry(PLAYER_R, PLAYER_H - PLAYER_R * 2, 8, 16), playerMat
+);
 playerMesh.castShadow = true;
 scene.add(playerMesh);
 
-// Eyes
 const eyeGeo = new THREE.SphereGeometry(0.07, 8, 8);
 const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 1 });
 [-0.15, 0.15].forEach(ex => {
@@ -293,7 +282,7 @@ const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00f
   playerMesh.add(eye);
 });
 
-// Awakening aura (sphere + light + zone ring)
+// Shared awakening geometry/materials (created once)
 const auraMat = new THREE.MeshBasicMaterial({
   color: 0xff2244, transparent: true, opacity: 0.25, toneMapped: false,
   side: THREE.DoubleSide, depthWrite: false,
@@ -316,12 +305,10 @@ zoneRing.visible = false;
 scene.add(zoneRing);
 
 const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-  .setTranslation(0, PLAYER_H / 2, 5)
-  .lockRotations();
+  .setTranslation(0, PLAYER_H / 2, 5).lockRotations();
 const playerBody = world.createRigidBody(playerBodyDesc);
 world.createCollider(
-  RAPIER.ColliderDesc.capsule(PLAYER_H / 2 - PLAYER_R, PLAYER_R).setFriction(0.1),
-  playerBody
+  RAPIER.ColliderDesc.capsule(PLAYER_H / 2 - PLAYER_R, PLAYER_R).setFriction(0.1), playerBody
 );
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
@@ -331,7 +318,7 @@ window.addEventListener("keydown", e => {
   if (!keys[e.code]) keyJustPressed[e.code] = true;
   keys[e.code] = true;
 });
-window.addEventListener("keyup",   e => { keys[e.code] = false; });
+window.addEventListener("keyup", e => { keys[e.code] = false; });
 
 let yaw = 0, pitch2 = 0;
 let isLocked = false;
@@ -340,13 +327,11 @@ document.addEventListener("pointerlockchange", () => {
   isLocked = document.pointerLockElement === renderer.domElement;
   lockPrompt.style.display = isLocked ? "none" : "block";
 });
-renderer.domElement.addEventListener("click", () => {
-  renderer.domElement.requestPointerLock();
-});
+renderer.domElement.addEventListener("click", () => { renderer.domElement.requestPointerLock(); });
 document.addEventListener("mousemove", e => {
   if (!isLocked) return;
-  yaw   -= e.movementX * 0.002;
-  pitch2 = Math.max(-0.5, Math.min(0.8, pitch2 - e.movementY * 0.002));
+  yaw    -= e.movementX * 0.002;
+  pitch2  = Math.max(-0.5, Math.min(0.8, pitch2 - e.movementY * 0.002));
 });
 
 let mouseLeft = false, mouseRight = false;
@@ -364,20 +349,19 @@ renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
 // ─── GAME STATE ─────────────────────────────────────────────────────────────
 let score = [0, 0];
 let stamina = 100;
-let shotCharge = 0;         // 0-100
+let shotCharge = 0;
 let isCharging = false;
-let slideTimer = 0;         // cooldown frames remaining
+let slideTimer = 0;
 const SLIDE_COOLDOWN = 90;
 let isGrounded = false;
 
-// Playstyle / skills / awakening
 let currentPlaystyle: Playstyle = "EGOIST";
-const skillCooldowns = new Map<string, number>();          // id -> seconds remaining
+const skillCooldowns = new Map<string, number>();
 let skillBoost: { kickMult: number; curve: number; timer: number } | null = null;
 
-let awakeningGauge = 0;      // 0-100
+let awakeningGauge = 0;
 let isAwakened = false;
-let awakeningTimer = 0;      // seconds remaining
+let awakeningTimer = 0;
 let activeAwakeningName = "";
 
 const equippedSkills = (): SkillConfig[] => skillsForPlaystyle(currentPlaystyle).slice(0, 3);
@@ -387,15 +371,10 @@ const activeAwakening = () => awakeningForPlaystyle(currentPlaystyle);
 function switchPlaystyle(ps: Playstyle) {
   currentPlaystyle = ps;
   skillBoost = null;
-  // End awakening if the new playstyle lacks the active one
-  if (isAwakened && activeAwakening().name !== activeAwakeningName) {
-    endAwakening();
-  }
-  playerMat.color.set(ps === "EGOIST" ? 0x882233 :
-                      ps === "PLAYMAKER" ? 0x887722 :
+  if (isAwakened && activeAwakening().name !== activeAwakeningName) endAwakening();
+  playerMat.color.set(ps === "EGOIST" ? 0x882233 : ps === "PLAYMAKER" ? 0x887722 :
                       ps === "LOCKDOWN" ? 0x228855 : 0x227799);
-  playerMat.emissive.set(ps === "EGOIST" ? 0x330011 :
-                         ps === "PLAYMAKER" ? 0x332200 :
+  playerMat.emissive.set(ps === "EGOIST" ? 0x330011 : ps === "PLAYMAKER" ? 0x332200 :
                          ps === "LOCKDOWN" ? 0x003322 : 0x002233);
   if (!isAwakened) {
     auraMesh.visible = false;
@@ -403,6 +382,7 @@ function switchPlaystyle(ps: Playstyle) {
     zoneRing.visible = false;
   }
   buildSkillPanel();
+  hudDirty.playstyle = true;
 }
 
 function handlePlaystyleKeys() {
@@ -411,7 +391,7 @@ function handlePlaystyleKeys() {
   });
 }
 
-// ─── SKILL SLOTS HUD ────────────────────────────────────────────────────────
+// ─── SKILL PANEL (rebuild on playstyle change only) ─────────────────────────
 function buildSkillPanel() {
   const equipped = equippedSkills();
   skillPanel.innerHTML = equipped.map((skill, i) => `
@@ -426,39 +406,80 @@ function buildSkillPanel() {
     </div>`).join("");
 }
 
+// Cache skill panel element refs after each rebuild
+let skillCdEls:   (HTMLElement | null)[] = [];
+let skillFillEls: (HTMLElement | null)[] = [];
+function cacheSkillPanelEls() {
+  skillCdEls   = [0, 1, 2].map(i => document.getElementById(`skill-cd-${i}`));
+  skillFillEls = [0, 1, 2].map(i => document.getElementById(`skill-cd-fill-${i}`));
+}
+
+// Throttle skill panel: only write DOM when values cross meaningful thresholds
+const prevSkillCdText: string[] = ["", "", ""];
+const prevSkillFillH:  string[] = ["", "", ""];
+
 function updateSkillPanel() {
   equippedSkills().forEach((skill, i) => {
-    const cdEl = document.getElementById(`skill-cd-${i}`);
-    const fillEl = document.getElementById(`skill-cd-fill-${i}`);
+    const cdEl   = skillCdEls[i];
+    const fillEl = skillFillEls[i];
     if (!cdEl || !fillEl) return;
     const cd = skillCooldowns.get(skill.id) ?? 0;
+    let text: string, color: string, fillH: string;
     if (cd > 0) {
-      cdEl.textContent = `${cd.toFixed(1)}s`;
-      cdEl.style.color = "#888";
-      fillEl.style.height = `${(cd / skill.cooldownSec) * 100}%`;
+      text  = `${cd.toFixed(1)}s`;
+      color = "#888";
+      fillH = `${((cd / skill.cooldownSec) * 100).toFixed(1)}%`;
     } else {
       const lowStam = stamina < skill.staminaCost;
-      cdEl.textContent = lowStam ? "LOW ST" : "READY";
-      cdEl.style.color = lowStam ? "#f55" : "#0ff";
-      fillEl.style.height = "0%";
+      text  = lowStam ? "LOW ST" : "READY";
+      color = lowStam ? "#f55" : "#0ff";
+      fillH = "0%";
+    }
+    if (prevSkillCdText[i] !== text) {
+      cdEl.textContent = text;
+      cdEl.style.color = color;
+      prevSkillCdText[i] = text;
+    }
+    if (prevSkillFillH[i] !== fillH) {
+      fillEl.style.height = fillH;
+      prevSkillFillH[i] = fillH;
     }
   });
 }
 
-// ─── SKILL VFX ──────────────────────────────────────────────────────────────
-interface SkillVfx { mesh: THREE.Mesh; life: number; maxLife: number; }
+// ─── SKILL VFX (pool ring geometry/material) ─────────────────────────────────
+const VFX_GEO = new THREE.RingGeometry(0.4, 0.65, 40);
+interface SkillVfx { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; life: number; maxLife: number; }
 const skillVfx: SkillVfx[] = [];
+// Pool of inactive meshes to reuse
+const vfxPool: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+
+function acquireVfxMesh(color: number): { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial } {
+  if (vfxPool.length > 0) {
+    const item = vfxPool.pop()!;
+    item.mat.color.setHex(color);
+    item.mat.opacity = 0.9;
+    item.mesh.visible = true;
+    return item;
+  }
+  const mat  = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, toneMapped: false, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(VFX_GEO, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  scene.add(mesh);
+  return { mesh, mat };
+}
+
+function releaseVfxMesh(item: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }) {
+  item.mesh.visible = false;
+  vfxPool.push(item);
+}
 
 function spawnSkillVfx(color: number) {
-  const pp = playerBody.translation();
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.4, 0.65, 40),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, toneMapped: false, side: THREE.DoubleSide })
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.set(pp.x, 0.06, pp.z);
-  scene.add(ring);
-  skillVfx.push({ mesh: ring, life: 0, maxLife: 0.5 });
+  const pp   = playerBody.translation();
+  const item = acquireVfxMesh(color);
+  item.mesh.position.set(pp.x, 0.06, pp.z);
+  item.mesh.scale.set(1, 1, 1);
+  skillVfx.push({ mesh: item.mesh, mat: item.mat, life: 0, maxLife: 0.5 });
 }
 
 function updateSkillVfx(dt: number) {
@@ -467,15 +488,13 @@ function updateSkillVfx(dt: number) {
     v.life += dt;
     const t = v.life / v.maxLife;
     if (t >= 1) {
-      scene.remove(v.mesh);
-      (v.mesh as THREE.Mesh).geometry.dispose();
-      ((v.mesh as THREE.Mesh).material as THREE.Material).dispose();
+      releaseVfxMesh({ mesh: v.mesh, mat: v.mat });
       skillVfx.splice(i, 1);
       continue;
     }
     const s = 1 + t * 6;
     v.mesh.scale.set(s, s, s);
-    ((v.mesh as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - t);
+    v.mat.opacity = 0.9 * (1 - t);
   }
 }
 
@@ -490,7 +509,6 @@ function triggerSkill(slot: number) {
   stamina -= skill.staminaCost;
   skillCooldowns.set(skill.id, skill.cooldownSec);
 
-  // Dash impulse along facing direction
   if (skill.dashImpulse > 0) {
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     playerBody.applyImpulse(
@@ -498,9 +516,7 @@ function triggerSkill(slot: number) {
     );
   }
 
-  // Kick / curve boost window (applies to the next kick within 2s)
   skillBoost = { kickMult: skill.kickPowerMultiplier, curve: skill.curveStrength, timer: 2.0 };
-
   spawnSkillVfx(skill.vfxColor);
 }
 
@@ -560,47 +576,90 @@ function endAwakening() {
 }
 
 function updateAwakening(dt: number) {
-  if (isAwakened) {
-    awakeningTimer -= dt;
-    // Gauge drains visually with remaining duration
-    const aw = activeAwakening();
-    awakeningGauge = Math.max(0, (awakeningTimer / aw.durationSec) * 100);
-    if (awakeningTimer <= 0) endAwakening();
+  if (!isAwakened) return;
+  awakeningTimer -= dt;
+  const aw = activeAwakening();
+  awakeningGauge = Math.max(0, (awakeningTimer / aw.durationSec) * 100);
+  if (awakeningTimer <= 0) { endAwakening(); return; }
 
-    // Pulse aura
-    const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.12;
-    const pp = playerBody.translation();
-    auraMesh.position.set(pp.x, pp.y, pp.z);
-    auraMesh.scale.setScalar(pulse);
-    auraLight.position.set(pp.x, pp.y + 0.5, pp.z);
-    auraLight.intensity = 2.5 + Math.sin(performance.now() * 0.008) * 1.2;
-    zoneRing.position.set(pp.x, 0.04, pp.z);
-    const rp = 1 + Math.sin(performance.now() * 0.005) * 0.04;
-    zoneRing.scale.set(rp, rp, 1);
-    zoneRingMat.opacity = 0.35 + Math.sin(performance.now() * 0.005) * 0.2;
-  }
+  const t = performance.now();
+  const pulse = 1 + Math.sin(t * 0.008) * 0.12;
+  const pp = playerBody.translation();
+  auraMesh.position.set(pp.x, pp.y, pp.z);
+  auraMesh.scale.setScalar(pulse);
+  auraLight.position.set(pp.x, pp.y + 0.5, pp.z);
+  auraLight.intensity = 2.5 + Math.sin(t * 0.008) * 1.2;
+  zoneRing.position.set(pp.x, 0.04, pp.z);
+  const rp = 1 + Math.sin(t * 0.005) * 0.04;
+  zoneRing.scale.set(rp, rp, 1);
+  zoneRingMat.opacity = 0.35 + Math.sin(t * 0.005) * 0.2;
 }
 
-// ─── HUD ────────────────────────────────────────────────────────────────────
-function updateHUD() {
-  scoreEl.textContent = `${score[0]} — ${score[1]}`;
-  (stamBar as HTMLElement).style.width = `${stamina}%`;
-  (shotBar as HTMLElement).style.width = `${shotCharge}%`;
+// ─── HUD (throttled dirty-flag updates) ─────────────────────────────────────
+// Only write to DOM when values change beyond a threshold
+const HUD_UPDATE_INTERVAL = 1 / 20; // 20 Hz cap for most HUD elements
+let hudAccum = 0;
+
+const hudDirty = {
+  score: true, stam: true, shot: true, curve: true, playstyle: true, aw: true,
+};
+
+// Previous HUD values for change detection
+let prevScore      = "";
+let prevStamW      = "";
+let prevShotW      = "";
+let prevCurve      = "";
+let prevPsText     = "";
+let prevAwW        = "";
+let prevAwReadyVis = "";
+let prevAwLabelTxt = "";
+
+function updateHUD(dt: number) {
+  hudAccum += dt;
+  if (hudAccum < HUD_UPDATE_INTERVAL) return;
+  hudAccum = 0;
+
+  // Score
+  const scoreStr = `${score[0]} — ${score[1]}`;
+  if (scoreStr !== prevScore) { scoreEl.textContent = scoreStr; prevScore = scoreStr; }
+
+  // Stamina
+  const stamW = `${stamina.toFixed(1)}%`;
+  if (stamW !== prevStamW) { stamBar.style.width = stamW; prevStamW = stamW; }
+
+  // Shot
+  const shotW = `${shotCharge.toFixed(1)}%`;
+  if (shotW !== prevShotW) { shotBar.style.width = shotW; prevShotW = shotW; }
+
+  // Curve
   const curve = keys["KeyQ"] ? "◄ L" : keys["KeyE"] ? "R ►" : "NONE";
-  curveInd.textContent = `CURVE: ${curve}`;
+  const curveStr = `CURVE: ${curve}`;
+  if (curveStr !== prevCurve) { curveInd.textContent = curveStr; prevCurve = curveStr; }
 
-  playstyleTag.innerHTML =
-    `${currentPlaystyle} <span style="opacity:.6;font-weight:normal;font-size:.7rem;">[1-4]</span>`;
-  playstyleTag.style.borderColor = PLAYSTYLE_HEX[currentPlaystyle];
-  playstyleTag.style.textShadow = `0 0 10px ${PLAYSTYLE_HEX[currentPlaystyle]}`;
+  // Playstyle tag (only on playstyle change)
+  if (hudDirty.playstyle) {
+    const hex = PLAYSTYLE_HEX[currentPlaystyle];
+    const psText = `${currentPlaystyle} <span style="opacity:.6;font-weight:normal;font-size:.7rem;">[1-4]</span>`;
+    if (psText !== prevPsText) {
+      playstyleTag.innerHTML = psText;
+      playstyleTag.style.borderColor = hex;
+      playstyleTag.style.textShadow = `0 0 10px ${hex}`;
+      prevPsText = psText;
+    }
+    hudDirty.playstyle = false;
+  }
 
-  (awBar as HTMLElement).style.width = `${awakeningGauge}%`;
-  awReady.style.display = !isAwakened && awakeningGauge >= 100 ? "block" : "none";
-  awLabel.textContent = isAwakened
+  // Awakening bar
+  const awW = `${awakeningGauge.toFixed(1)}%`;
+  if (awW !== prevAwW) { awBar.style.width = awW; prevAwW = awW; }
+
+  const awReadyVis = (!isAwakened && awakeningGauge >= 100) ? "block" : "none";
+  if (awReadyVis !== prevAwReadyVis) { awReady.style.display = awReadyVis; prevAwReadyVis = awReadyVis; }
+
+  const awLabelTxt = isAwakened
     ? `${activeAwakeningName.toUpperCase()} ${awakeningTimer.toFixed(1)}s`
-    : awakeningGauge >= 100
-      ? "PRESS R"
-      : `GAUGE ${Math.floor(awakeningGauge)}%`;
+    : awakeningGauge >= 100 ? "PRESS R" : `GAUGE ${Math.floor(awakeningGauge)}%`;
+  if (awLabelTxt !== prevAwLabelTxt) { awLabel.textContent = awLabelTxt; prevAwLabelTxt = awLabelTxt; }
 
   updateSkillPanel();
 }
@@ -616,18 +675,15 @@ function checkGoal() {
 
 // ─── GROUNDED CHECK ─────────────────────────────────────────────────────────
 function checkGrounded() {
-  const pp = playerBody.translation();
-  // Cast ray downward
+  const pp  = playerBody.translation();
   const ray = new RAPIER.Ray({ x: pp.x, y: pp.y, z: pp.z }, { x: 0, y: -1, z: 0 });
   const hit = world.castRay(ray, 1.1, true);
   isGrounded = hit !== null && hit.timeOfImpact < 1.0;
 }
 
 // ─── DRIBBLE / SHOT ─────────────────────────────────────────────────────────
-const DRIBBLE_DIST = 1.1;
-const DRIBBLE_FORCE = 18;
-const MAX_SHOT = 55;
-let wasDribbling = false;
+const DRIBBLE_DIST = 1.1, DRIBBLE_FORCE = 18, MAX_SHOT = 55;
+const _fwdVec = new THREE.Vector3(); // reusable
 
 function dribbleAndShoot(dt: number) {
   const pp = playerBody.translation();
@@ -639,65 +695,54 @@ function dribbleAndShoot(dt: number) {
   const playerSpeed = Math.sqrt(pv.x * pv.x + pv.z * pv.z);
   const dribbling = dist < DRIBBLE_DIST && !isCharging && playerSpeed > 1.5;
 
-  // Magnetic dribble
   if (dist < DRIBBLE_DIST && !isCharging) {
-    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    const targetX = pp.x + fwd.x * DRIBBLE_DIST * 0.7;
-    const targetZ = pp.z + fwd.z * DRIBBLE_DIST * 0.7;
-    const forceMag = DRIBBLE_FORCE;
-    const fx = (targetX - bp.x) * forceMag;
-    const fz = (targetZ - bp.z) * forceMag;
+    _fwdVec.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const targetX = pp.x + _fwdVec.x * DRIBBLE_DIST * 0.7;
+    const targetZ = pp.z + _fwdVec.z * DRIBBLE_DIST * 0.7;
+    const fx = (targetX - bp.x) * DRIBBLE_FORCE;
+    const fz = (targetZ - bp.z) * DRIBBLE_FORCE;
     ballBody.applyImpulse({ x: fx * dt, y: 0, z: fz * dt }, true);
   }
 
-  // Awakening gauge: dribble progress
   if (dribbling) addGauge(7 * dt);
-  wasDribbling = dribbling;
 
-  // Charge shot
   if (mouseLeft && dist < DRIBBLE_DIST * 1.5 && isLocked) {
     isCharging = true;
     shotCharge = Math.min(100, shotCharge + 60 * dt);
   } else if (isCharging && !mouseLeft) {
-    // Release shot
-    const boostMult = skillBoost ? skillBoost.kickMult : 1;
+    const boostMult  = skillBoost ? skillBoost.kickMult : 1;
     const awakenMult = isAwakened ? activeAwakening().shotPowerMultiplier : 1;
     const power = (shotCharge / 100) * MAX_SHOT * boostMult * awakenMult;
-    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+    _fwdVec.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
     const spin = keys["KeyQ"] ? -1 : keys["KeyE"] ? 1 : 0;
     const skillCurve = skillBoost ? skillBoost.curve : 0;
 
-    ballBody.applyImpulse({ x: fwd.x * power, y: power * 0.08, z: fwd.z * power }, true);
+    ballBody.applyImpulse({ x: _fwdVec.x * power, y: power * 0.08, z: _fwdVec.z * power }, true);
 
-    // Magnus spin torque
     if (spin !== 0) {
-      ballBody.applyTorqueImpulse(
-        { x: 0, y: spin * power * (0.08 + skillCurve * 0.04), z: 0 }, true
-      );
+      ballBody.applyTorqueImpulse({ x: 0, y: spin * power * (0.08 + skillCurve * 0.04), z: 0 }, true);
     } else if (skillCurve > 0) {
       ballBody.applyTorqueImpulse({ x: 0, y: skillCurve * power * 0.05, z: 0 }, true);
     }
 
-    // Awakening gauge: shots taken (scaled by charge)
     addGauge(8 + shotCharge * 0.1);
-    skillBoost = null;   // boost is consumed by the kick
+    skillBoost = null;
     shotCharge = 0;
     isCharging = false;
   } else if (!mouseLeft) {
-    shotCharge = Math.max(0, shotCharge - 40 * dt);
     if (!isCharging) shotCharge = 0;
+    else shotCharge = Math.max(0, shotCharge - 40 * dt);
     isCharging = false;
   }
 }
 
-// ─── MAGNUS CONTINUOUS ──────────────────────────────────────────────────────
+// ─── MAGNUS ─────────────────────────────────────────────────────────────────
 function applyMagnus() {
   const spin = keys["KeyQ"] ? -1 : keys["KeyE"] ? 1 : 0;
   if (spin === 0) return;
   const lv = ballBody.linvel();
   const speed = Math.sqrt(lv.x * lv.x + lv.y * lv.y + lv.z * lv.z);
   if (speed < 0.5) return;
-  // F = omega × v (simplified: horizontal perpendicular)
   const perpX = -lv.z / speed;
   const perpZ =  lv.x / speed;
   const mag = spin * speed * 0.08;
@@ -706,9 +751,10 @@ function applyMagnus() {
 
 // ─── PLAYER MOVEMENT ────────────────────────────────────────────────────────
 const SPEED_WALK = 7, SPEED_SPRINT = 12, SPEED_SLIDE = 20;
+const _moveVec = new THREE.Vector3();
 
 function movePlayer(dt: number) {
-  const fwd  = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const fwd   = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   const right = new THREE.Vector3(-Math.sin(yaw - Math.PI / 2), 0, -Math.cos(yaw - Math.PI / 2));
 
   let mx = 0, mz = 0;
@@ -718,26 +764,22 @@ function movePlayer(dt: number) {
   if (keys["KeyD"]) { mx += right.x; mz += right.z; }
 
   const awakenSpeed = isAwakened ? activeAwakening().speedMultiplier : 1;
-  const sprinting = keys["ShiftLeft"] && stamina > 0 && (Math.abs(mx) + Math.abs(mz) > 0);
-  const baseSpeed = slideTimer > 0 ? SPEED_SLIDE
-                  : sprinting ? SPEED_SPRINT : SPEED_WALK;
-  const speed = baseSpeed * awakenSpeed;
+  const moving    = Math.abs(mx) + Math.abs(mz) > 0;
+  const sprinting = keys["ShiftLeft"] && stamina > 0 && moving;
+  const baseSpeed = slideTimer > 0 ? SPEED_SLIDE : sprinting ? SPEED_SPRINT : SPEED_WALK;
+  const speed     = baseSpeed * awakenSpeed;
 
   if (sprinting) stamina = Math.max(0, stamina - 25 * dt);
   else           stamina = Math.min(100, stamina + 15 * dt);
 
-  // Slide tackle
   if (mouseRight && slideTimer <= 0 && isGrounded) {
     slideTimer = SLIDE_COOLDOWN;
     const impulse = SPEED_SLIDE * 1.5;
     playerBody.applyImpulse({ x: fwd.x * impulse, y: 0, z: fwd.z * impulse }, true);
-
-    // Awakening gauge: tackle attempt + bonus if ball is won
     addGauge(6);
     const pp = playerBody.translation();
     const bp = ballBody.translation();
-    const tackleDist = Math.hypot(bp.x - pp.x, bp.z - pp.z);
-    if (tackleDist < 3.0) addGauge(14);   // successful tackle
+    if (Math.hypot(bp.x - pp.x, bp.z - pp.z) < 3.0) addGauge(14);
   }
   if (slideTimer > 0) { slideTimer--; return; }
 
@@ -751,41 +793,54 @@ function movePlayer(dt: number) {
     playerBody.setLinvel({ x: cv.x * 0.7, y: cv.y, z: cv.z * 0.7 }, true);
   }
 
-  // Jump
   if (keys["Space"] && isGrounded) {
     playerBody.applyImpulse({ x: 0, y: 12, z: 0 }, true);
   }
 }
 
-// ─── CAMERA FOLLOW ──────────────────────────────────────────────────────────
+// ─── CAMERA ─────────────────────────────────────────────────────────────────
 const camOffset = new THREE.Vector3(0, 2.5, 5.5);
+const _camPivot = new THREE.Vector3();
+const _camQYaw  = new THREE.Quaternion();
+const _camQPitch= new THREE.Quaternion();
+const _camEuler = new THREE.Euler();
+
 function updateCamera() {
   const pp = playerBody.translation();
-  const pivot = new THREE.Vector3(pp.x, pp.y + 0.8, pp.z);
-  const qYaw   = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
-  const qPitch = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch2, 0, 0));
-  const offset = camOffset.clone().applyQuaternion(qYaw.multiply(qPitch));
-  camera.position.copy(pivot).add(offset);
-  camera.lookAt(pivot);
+  _camPivot.set(pp.x, pp.y + 0.8, pp.z);
+  _camEuler.set(0, yaw, 0);
+  _camQYaw.setFromEuler(_camEuler);
+  _camEuler.set(pitch2, 0, 0);
+  _camQPitch.setFromEuler(_camEuler);
+  const offset = camOffset.clone().applyQuaternion(_camQYaw.multiply(_camQPitch));
+  camera.position.copy(_camPivot).add(offset);
+  camera.lookAt(_camPivot);
 }
 
-// ─── TRAIL UPDATE ───────────────────────────────────────────────────────────
+// ─── TRAIL ──────────────────────────────────────────────────────────────────
 function updateTrail() {
   const bp = ballBody.translation();
-  trailHistory.push(new THREE.Vector3(bp.x, bp.y, bp.z));
-  if (trailHistory.length > TRAIL_LEN) trailHistory.shift();
+  if (trailHistory.length >= TRAIL_LEN) trailHistory.shift();
+  const last = trailHistory[trailHistory.length - 1];
+  if (!last || last.x !== bp.x || last.y !== bp.y || last.z !== bp.z) {
+    trailHistory.push(new THREE.Vector3(bp.x, bp.y, bp.z));
+  }
 
   const attr = trailGeo.attributes["position"] as THREE.BufferAttribute;
-  for (let i = 0; i < TRAIL_LEN; i++) {
-    const p = trailHistory[i] ?? (trailHistory[0] ?? new THREE.Vector3());
-    attr.setXYZ(i, p.x, p.y, p.z);
+  const len  = trailHistory.length;
+  for (let i = 0; i < len; i++) {
+    const p = trailHistory[i];
+    attr.array[i * 3]     = p.x;
+    attr.array[i * 3 + 1] = p.y;
+    attr.array[i * 3 + 2] = p.z;
   }
   attr.needsUpdate = true;
-  trailGeo.setDrawRange(0, trailHistory.length);
+  trailGeo.setDrawRange(0, len);
 }
 
 // ─── MAIN LOOP ──────────────────────────────────────────────────────────────
 buildSkillPanel();
+cacheSkillPanelEls();
 let lastTime = performance.now();
 
 function animate() {
@@ -801,7 +856,12 @@ function animate() {
 
   updateCooldowns(dt);
 
-  world.step();
+  // Fixed-step physics accumulator
+  physicsAccum += dt;
+  while (physicsAccum >= FIXED_DT) {
+    world.step();
+    physicsAccum -= FIXED_DT;
+  }
 
   checkGrounded();
   movePlayer(dt);
@@ -819,12 +879,12 @@ function animate() {
   const bp = ballBody.translation();
   ballMesh.position.set(bp.x, bp.y, bp.z);
   const bav = ballBody.angvel();
-  ballMesh.rotation.x += bav.x * 0.016;
-  ballMesh.rotation.z += bav.z * 0.016;
+  ballMesh.rotation.x += bav.x * FIXED_DT;
+  ballMesh.rotation.z += bav.z * FIXED_DT;
 
   updateTrail();
   updateCamera();
-  updateHUD();
+  updateHUD(dt);
 
   renderer.render(scene, camera);
 }
