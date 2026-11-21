@@ -60,14 +60,14 @@ hud.innerHTML = `
   <div style="font-size:.58rem;font-weight:700;letter-spacing:2px;opacity:.85;">SHOT</div>
 </div>
 
-<!-- Compact Circular Aiming Reticle Over Player's Head -->
-<div id="aim-reticle" style="display:none;position:absolute;top:34%;left:50%;width:38px;height:38px;
-  transform:translate(-50%,-50%);border-radius:50%;border:1.5px solid rgba(255,255,255,.62);
-  background:rgba(15,23,42,.22);box-shadow:0 2px 8px rgba(0,0,0,.35);">
+<!-- Compact Circular Aiming Reticle (ONLY visible while charging a shot) -->
+<div id="aim-reticle" style="display:none;opacity:0;position:absolute;top:34%;left:50%;width:36px;height:36px;
+  transform:translate(-50%,-50%);border-radius:50%;border:1.5px solid rgba(255,255,255,.72);
+  background:rgba(15,23,42,.24);box-shadow:0 2px 8px rgba(0,0,0,.35);">
   <div style="position:absolute;top:50%;left:50%;width:2.5px;height:2.5px;margin:-1.25px 0 0 -1.25px;
     border-radius:50%;background:rgba(255,255,255,.92);"></div>
   <div id="aim-dot" style="position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px 0 0 -3px;
-    border-radius:50%;background:#fbbf24;border:1px solid #fff;opacity:0;"></div>
+    border-radius:50%;background:#fbbf24;border:1px solid #fff;"></div>
 </div>
 
 <div id="skill-panel" style="position:absolute;bottom:34px;right:24px;display:flex;gap:8px;"></div>
@@ -408,7 +408,6 @@ function buildStadiumAtmosphere() {
     scene.add(screen);
   });
 
-  // Animated 3D Spectators (matte sports clothing colors)
   const crowdGeo = new THREE.CylinderGeometry(0.22, 0.34, 1.08, 6);
   const crowdMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   crowdMesh = new THREE.InstancedMesh(crowdGeo, crowdMat, CROWD_COUNT);
@@ -444,7 +443,6 @@ function buildStadiumAtmosphere() {
   if (crowdMesh.instanceColor) crowdMesh.instanceColor.needsUpdate = true;
   scene.add(crowdMesh);
 
-  // Corner stadium floodlight towers (warm daylight floodlight banks)
   const mastGeo = new THREE.CylinderGeometry(0.45, 0.72, 34, 8);
   const mastMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.45, roughness: 0.55 });
   const headGeo = new THREE.BoxGeometry(4.2, 1.5, 0.9);
@@ -641,14 +639,14 @@ makeStaticBox(PITCH_W / 2, wallH / 2, 0.25, 0, wallH / 2, hd);
 });
 
 // ─── CEL-SHADING & OUTLINE HELPERS ──────────────────────────────────────────
-const toonGradData = new Uint8Array([105, 185, 255]);
+const toonGradData = new Uint8Array([108, 188, 255]);
 const toonGradTex = new THREE.DataTexture(toonGradData, 3, 1, THREE.RedFormat);
 toonGradTex.minFilter = THREE.NearestFilter;
 toonGradTex.magFilter = THREE.NearestFilter;
 toonGradTex.needsUpdate = true;
 
 const outlineMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.BackSide });
-function addOutline(mesh: THREE.Mesh, scale = 1.065) {
+function addOutline(mesh: THREE.Mesh, scale = 1.055) {
   const outline = new THREE.Mesh(mesh.geometry, outlineMat);
   outline.scale.setScalar(scale);
   mesh.add(outline);
@@ -662,7 +660,6 @@ function makeSoccerBallTexture(): THREE.CanvasTexture {
   ctx.fillStyle = "#f8fafc";
   ctx.fillRect(0, 0, c.width, c.height);
 
-  // Subtle stitched seam grid
   ctx.strokeStyle = "#cbd5e1";
   ctx.lineWidth = 3;
   for (let x = 0; x < c.width; x += 64) {
@@ -672,7 +669,6 @@ function makeSoccerBallTexture(): THREE.CanvasTexture {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(c.width, y); ctx.stroke();
   }
 
-  // Classic black pentagon leather patches
   ctx.fillStyle = "#1e293b";
   const drawPentagon = (cx: number, cy: number, r: number) => {
     ctx.beginPath();
@@ -709,7 +705,7 @@ const ballCoreMat = new THREE.MeshStandardMaterial({
 });
 const ballCore = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 24, 18), ballCoreMat);
 ballCore.castShadow = true;
-addOutline(ballCore, 1.055);
+addOutline(ballCore, 1.05);
 ballVisual.add(ballCore);
 
 const TRAIL_LEN = 36;
@@ -734,7 +730,7 @@ const ballCollider = world.createCollider(
 );
 ballCollider.setCollisionGroups(BALL_GROUPS_FREE);
 
-// ─── ARTICULATED ANIME SOCCER PLAYER RIG (MATTE ATHLETIC KIT) ──────────────
+// ─── ARTICULATED ANIME-SPORTS PLAYER RIG (ANATOMICAL PROPORTIONS) ───────────
 const PLAYER_H = 1.8, PLAYER_R = 0.35;
 
 const jerseyMat = new THREE.MeshToonMaterial({ color: 0xdc2626, gradientMap: toonGradTex });
@@ -747,7 +743,7 @@ const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
 const irisMat = new THREE.MeshBasicMaterial({ color: 0x1d4ed8 });
 const browMat = new THREE.MeshBasicMaterial({ color: 0x181c2e });
 const cleatMat = new THREE.MeshToonMaterial({ color: 0x1e293b, gradientMap: toonGradTex });
-const cleatStripeMat = new THREE.MeshToonMaterial({ color: 0xf8fafc, gradientMap: toonGradTex });
+const cleatStripeMat = new THREE.MeshToonMaterial({ color: 0xdc2626, gradientMap: toonGradTex });
 
 const playerRoot = new THREE.Group();
 scene.add(playerRoot);
@@ -756,168 +752,177 @@ const torsoGroup = new THREE.Group();
 torsoGroup.position.set(0, 0.90, 0);
 playerRoot.add(torsoGroup);
 
-const pelvisMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, 0.22), shortsMat);
+// Athletic hips, tapered waist & V-shaped chest
+const pelvisMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.168, 0.14, 10), shortsMat);
+pelvisMesh.scale.set(1.12, 1, 0.72);
 pelvisMesh.position.set(0, 0.02, 0);
 pelvisMesh.castShadow = true;
-addOutline(pelvisMesh, 1.06);
+addOutline(pelvisMesh, 1.055);
 torsoGroup.add(pelvisMesh);
 
-const waistMesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.20, 0.20), jerseyMat);
-waistMesh.position.set(0, 0.18, 0);
+const waistMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.142, 0.21, 10), jerseyMat);
+waistMesh.scale.set(1.06, 1, 0.68);
+waistMesh.position.set(0, 0.185, 0);
 waistMesh.castShadow = true;
-addOutline(waistMesh, 1.06);
+addOutline(waistMesh, 1.055);
 torsoGroup.add(waistMesh);
 
-const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.41, 0.30, 0.23), jerseyMat);
-chestMesh.position.set(0, 0.38, 0);
+const chestMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.165, 0.26, 10), jerseyMat);
+chestMesh.scale.set(1.08, 1, 0.68);
+chestMesh.position.set(0, 0.39, 0);
 chestMesh.castShadow = true;
-addOutline(chestMesh, 1.06);
+addOutline(chestMesh, 1.055);
 torsoGroup.add(chestMesh);
 
-const collarMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.06, 8), jerseyDarkMat);
-collarMesh.position.set(0, 0.54, 0);
+const collarMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.095, 0.055, 10), jerseyDarkMat);
+collarMesh.position.set(0, 0.525, 0);
 torsoGroup.add(collarMesh);
 
-const chestSash = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.055, 0.24), accentMat);
-chestSash.position.set(0, 0.41, 0);
-torsoGroup.add(chestSash);
+const chestBand = new THREE.Mesh(new THREE.CylinderGeometry(0.188, 0.178, 0.052, 10), accentMat);
+chestBand.scale.set(1.09, 1, 0.70);
+chestBand.position.set(0, 0.39, 0);
+torsoGroup.add(chestBand);
 
-const sideTrimGeo = new THREE.BoxGeometry(0.036, 0.43, 0.225);
-[-0.185, 0.185].forEach(sx => {
-  const trim = new THREE.Mesh(sideTrimGeo, jerseyDarkMat);
-  trim.position.set(sx, 0.31, 0);
-  torsoGroup.add(trim);
-});
-
-[-0.042, 0.042].forEach(nx => {
-  const numBar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.16, 0.015), accentMat);
-  numBar.position.set(nx, 0.35, 0.118);
+[-0.04, 0.04].forEach(nx => {
+  const numBar = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.145, 0.014), accentMat);
+  numBar.position.set(nx, 0.33, 0.125);
   torsoGroup.add(numBar);
 });
 
+// Proportional Anime Head, Neck & Layered Hair
 const headGroup = new THREE.Group();
-headGroup.position.set(0, 0.56, 0);
+headGroup.position.set(0, 0.54, 0);
 torsoGroup.add(headGroup);
 
-const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.068, 0.09, 8), skinMat);
-neckMesh.position.set(0, 0.04, 0);
+const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.056, 0.10, 8), skinMat);
+neckMesh.position.set(0, 0.045, 0);
 headGroup.add(neckMesh);
 
-const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), skinMat);
+const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.132, 14, 12), skinMat);
+headMesh.scale.set(0.92, 1.04, 0.94);
 headMesh.position.set(0, 0.20, 0);
 headMesh.castShadow = true;
-addOutline(headMesh, 1.065);
+addOutline(headMesh, 1.055);
 headGroup.add(headMesh);
 
-const chinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.19), skinMat);
-chinMesh.position.set(0, 0.085, -0.02);
-addOutline(chinMesh, 1.06);
+const chinMesh = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.09, 8), skinMat);
+chinMesh.rotation.x = Math.PI;
+chinMesh.scale.set(1.0, 1.0, 0.85);
+chinMesh.position.set(0, 0.098, -0.028);
 headGroup.add(chinMesh);
 
-// Clean anime eyes & brows (no cyber visor)
-const eyeGeo  = new THREE.BoxGeometry(0.056, 0.032, 0.014);
-const irisGeo = new THREE.BoxGeometry(0.028, 0.026, 0.016);
-const browGeo = new THREE.BoxGeometry(0.062, 0.014, 0.016);
-[-0.062, 0.062].forEach((ex, idx) => {
+// Expressive anime eyes & brows
+const eyeGeo  = new THREE.BoxGeometry(0.048, 0.028, 0.014);
+const irisGeo = new THREE.BoxGeometry(0.024, 0.024, 0.016);
+const browGeo = new THREE.BoxGeometry(0.054, 0.012, 0.016);
+[-0.052, 0.052].forEach((ex, idx) => {
   const eye = new THREE.Mesh(eyeGeo, eyeWhiteMat);
-  eye.position.set(ex, 0.195, -0.131);
+  eye.position.set(ex, 0.195, -0.116);
   headGroup.add(eye);
 
   const iris = new THREE.Mesh(irisGeo, irisMat);
-  iris.position.set(ex, 0.195, -0.133);
+  iris.position.set(ex, 0.194, -0.118);
   headGroup.add(iris);
 
   const brow = new THREE.Mesh(browGeo, browMat);
-  brow.position.set(ex, 0.228, -0.133);
+  brow.position.set(ex, 0.224, -0.118);
   brow.rotation.z = idx === 0 ? -0.14 : 0.14;
   headGroup.add(brow);
 });
 
-const headband = new THREE.Mesh(new THREE.BoxGeometry(0.282, 0.042, 0.282), accentMat);
-headband.position.set(0, 0.268, 0);
+const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.132, 0.132, 0.036, 14), accentMat);
+headband.scale.set(0.95, 1, 0.97);
+headband.position.set(0, 0.258, 0);
 headGroup.add(headband);
 
-const tailGeo = new THREE.BoxGeometry(0.032, 0.19, 0.018);
+const tailGeo = new THREE.BoxGeometry(0.026, 0.17, 0.012);
 const headbandTails: THREE.Mesh[] = [];
-[-0.038, 0.038].forEach((tx, idx) => {
+[-0.032, 0.032].forEach((tx, idx) => {
   const tail = new THREE.Mesh(tailGeo, accentMat);
-  tail.position.set(tx, 0.21, 0.185);
+  tail.position.set(tx, 0.21, 0.155);
   tail.rotation.x = 0.58;
   tail.rotation.z = idx === 0 ? 0.22 : -0.22;
   headGroup.add(tail);
   headbandTails.push(tail);
 });
 
-const hairCap = new THREE.Mesh(new THREE.BoxGeometry(0.285, 0.08, 0.285), hairMat);
-hairCap.position.set(0, 0.32, 0.01);
-addOutline(hairCap, 1.055);
+const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.138, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hairMat);
+hairCap.scale.set(0.98, 1.05, 1.02);
+hairCap.position.set(0, 0.225, 0.008);
+addOutline(hairCap, 1.045);
 headGroup.add(hairCap);
 
-const spikeGeo = new THREE.ConeGeometry(0.056, 0.20, 5);
-const bangGeo  = new THREE.ConeGeometry(0.036, 0.13, 4);
+const spikeGeo = new THREE.ConeGeometry(0.048, 0.175, 5);
+const bangGeo  = new THREE.ConeGeometry(0.032, 0.125, 4);
 const spikeConfigs = [
-  [0,     0.38, -0.05, -0.45, 0,     0],
-  [-0.09, 0.37, -0.02, -0.35, 0,     0.36],
-  [0.09,  0.37, -0.02, -0.35, 0,    -0.36],
-  [-0.05, 0.32, -0.12, -0.82, 0,     0.18],
-  [0.05,  0.32, -0.12, -0.82, 0,    -0.18],
-  [0,     0.39,  0.06,  0.40, 0,     0],
-  [-0.08, 0.35,  0.10,  0.55, 0,     0.30],
-  [0.08,  0.35,  0.10,  0.55, 0,    -0.30],
-  [0,     0.29,  0.14,  0.95, 0,     0],
+  [0,     0.36, -0.04, -0.45, 0,     0],
+  [-0.08, 0.35, -0.02, -0.35, 0,     0.38],
+  [0.08,  0.35, -0.02, -0.35, 0,    -0.38],
+  [-0.04, 0.31, -0.10, -0.82, 0,     0.18],
+  [0.04,  0.31, -0.10, -0.82, 0,    -0.18],
+  [0,     0.37,  0.06,  0.42, 0,     0],
+  [-0.08, 0.33,  0.09,  0.58, 0,     0.32],
+  [0.08,  0.33,  0.09,  0.58, 0,    -0.32],
+  [0,     0.27,  0.13,  0.96, 0,     0],
 ] as const;
 spikeConfigs.forEach(([x, y, z, rx, ry, rz]) => {
   const spike = new THREE.Mesh(spikeGeo, hairMat);
   spike.position.set(x, y, z);
   spike.rotation.set(rx, ry, rz);
   spike.castShadow = true;
-  addOutline(spike, 1.06);
+  addOutline(spike, 1.055);
   headGroup.add(spike);
 });
-[-0.125, 0.125].forEach((bx, i) => {
+[-0.108, 0.108].forEach((bx, i) => {
   const sideLock = new THREE.Mesh(bangGeo, hairMat);
-  sideLock.position.set(bx, 0.21, -0.09);
-  sideLock.rotation.set(2.85, 0, i === 0 ? -0.18 : 0.18);
+  sideLock.position.set(bx, 0.20, -0.075);
+  sideLock.rotation.set(2.82, 0, i === 0 ? -0.18 : 0.18);
   headGroup.add(sideLock);
 });
 
+// Anatomical Arms: Shoulder -> Sleeve -> Upper Arm -> Elbow -> Forearm -> Wrist -> Hand
 interface ArmRig { shoulder: THREE.Group; elbow: THREE.Group; }
 function makeArm(side: -1 | 1): ArmRig {
   const shoulder = new THREE.Group();
-  shoulder.position.set(side * 0.255, 0.455, 0);
+  shoulder.position.set(side * 0.235, 0.45, 0);
 
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.068, 8, 8), jerseyMat);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.060, 10, 8), jerseyMat);
   cap.castShadow = true;
-  addOutline(cap, 1.07);
+  addOutline(cap, 1.06);
   shoulder.add(cap);
 
-  const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.15, 0.105), jerseyMat);
-  sleeve.position.set(0, -0.08, 0);
+  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.052, 0.135, 8), jerseyMat);
+  sleeve.position.set(0, -0.065, 0);
   sleeve.castShadow = true;
-  addOutline(sleeve, 1.07);
+  addOutline(sleeve, 1.06);
   shoulder.add(sleeve);
 
-  const bicep = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.10, 0.086), skinMat);
-  bicep.position.set(0, -0.18, 0);
-  addOutline(bicep, 1.07);
-  shoulder.add(bicep);
+  const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.039, 0.13, 8), skinMat);
+  upperArm.position.set(0, -0.175, 0);
+  upperArm.castShadow = true;
+  addOutline(upperArm, 1.06);
+  shoulder.add(upperArm);
 
   const elbow = new THREE.Group();
-  elbow.position.set(0, -0.23, 0);
+  elbow.position.set(0, -0.235, 0);
   shoulder.add(elbow);
 
-  const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.080, 0.20, 0.080), skinMat);
-  forearm.position.set(0, -0.10, 0);
+  const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.039, 8, 8), skinMat);
+  addOutline(elbowJoint, 1.06);
+  elbow.add(elbowJoint);
+
+  const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.031, 0.21, 8), skinMat);
+  forearm.position.set(0, -0.105, 0);
   forearm.castShadow = true;
-  addOutline(forearm, 1.07);
+  addOutline(forearm, 1.06);
   elbow.add(forearm);
 
-  const band = new THREE.Mesh(new THREE.BoxGeometry(0.090, 0.042, 0.090), accentMat);
-  band.position.set(0, -0.185, 0);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.038, 8), accentMat);
+  band.position.set(0, -0.19, 0);
   elbow.add(band);
 
-  const hand = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.09, 0.08), skinMat);
-  hand.position.set(0, -0.245, -0.005);
+  const hand = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.082, 0.046), skinMat);
+  hand.position.set(0, -0.245, -0.004);
   hand.castShadow = true;
   addOutline(hand, 1.07);
   elbow.add(hand);
@@ -928,48 +933,56 @@ function makeArm(side: -1 | 1): ArmRig {
 const leftArm  = makeArm(-1);
 const rightArm = makeArm(1);
 
+// Anatomical Legs: Hip -> Shorts Cuff -> Thigh -> Knee -> Calf/Sock -> Cleat
 interface LegRig { hip: THREE.Group; knee: THREE.Group; }
 function makeLeg(side: -1 | 1): LegRig {
   const hip = new THREE.Group();
-  hip.position.set(side * 0.105, 0.87, 0);
+  hip.position.set(side * 0.10, 0.87, 0);
 
-  const shortsLeg = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.21, 0.165), shortsMat);
-  shortsLeg.position.set(0, -0.10, 0);
+  const shortsLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.072, 0.20, 10), shortsMat);
+  shortsLeg.position.set(0, -0.09, 0);
   shortsLeg.castShadow = true;
-  addOutline(shortsLeg, 1.06);
+  addOutline(shortsLeg, 1.055);
   hip.add(shortsLeg);
 
-  const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.118, 0.17, 0.122), skinMat);
+  const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.050, 0.19, 8), skinMat);
   thigh.position.set(0, -0.26, 0);
-  addOutline(thigh, 1.07);
+  thigh.castShadow = true;
+  addOutline(thigh, 1.06);
   hip.add(thigh);
 
   const knee = new THREE.Group();
-  knee.position.set(0, -0.35, 0);
+  knee.position.set(0, -0.355, 0);
   hip.add(knee);
 
-  const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 8), skinMat);
-  addOutline(kneeJoint, 1.07);
+  const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.050, 8, 8), skinMat);
+  addOutline(kneeJoint, 1.06);
   knee.add(kneeJoint);
 
-  const sock = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.34, 0.12), jerseyMat);
-  sock.position.set(0, -0.18, 0);
-  sock.castShadow = true;
-  addOutline(sock, 1.07);
-  knee.add(sock);
+  const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.054, 0.039, 0.34, 10), jerseyMat);
+  calf.position.set(0, -0.18, 0);
+  calf.castShadow = true;
+  addOutline(calf, 1.06);
+  knee.add(calf);
 
-  const sockStripe = new THREE.Mesh(new THREE.BoxGeometry(0.122, 0.035, 0.126), accentMat);
-  sockStripe.position.set(0, -0.04, 0);
-  knee.add(sockStripe);
+  const sockBand = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.055, 0.035, 10), accentMat);
+  sockBand.position.set(0, -0.035, 0);
+  knee.add(sockBand);
 
-  const cleatBody = new THREE.Mesh(new THREE.BoxGeometry(0.132, 0.095, 0.25), cleatMat);
-  cleatBody.position.set(0, -0.39, -0.04);
-  cleatBody.castShadow = true;
-  addOutline(cleatBody, 1.06);
-  knee.add(cleatBody);
+  const cleatHeel = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.085, 0.13), cleatMat);
+  cleatHeel.position.set(0, -0.385, 0.01);
+  cleatHeel.castShadow = true;
+  addOutline(cleatHeel, 1.06);
+  knee.add(cleatHeel);
 
-  const cleatStripe = new THREE.Mesh(new THREE.BoxGeometry(0.138, 0.025, 0.255), cleatStripeMat);
-  cleatStripe.position.set(0, -0.425, -0.04);
+  const cleatToe = new THREE.Mesh(new THREE.BoxGeometry(0.102, 0.064, 0.13), cleatMat);
+  cleatToe.position.set(0, -0.395, -0.095);
+  cleatToe.castShadow = true;
+  addOutline(cleatToe, 1.06);
+  knee.add(cleatToe);
+
+  const cleatStripe = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.022, 0.22), cleatStripeMat);
+  cleatStripe.position.set(0, -0.42, -0.04);
   knee.add(cleatStripe);
 
   playerRoot.add(hip);
@@ -1055,7 +1068,7 @@ window.addEventListener("keyup", e => { keys[e.code] = false; });
 let yaw = 0, pitch2 = 0;
 let isLocked = false;
 
-const AIM_RADIUS = 16;
+const AIM_RADIUS = 15;
 let aimOffsetX = 0;
 let aimOffsetY = 0;
 
@@ -1116,6 +1129,8 @@ let runCycle = 0;
 let rigAnimSpeed = 0;
 let kickAnimTimer = 0;
 let rainbowFlickTimer = 0;
+let rainbowStageTimer = 0;
+let pendingFlickFwdVel = 0;
 
 type SkillAnimType = "none" | "heel" | "spin" | "feint";
 let activeSkillAnim: SkillAnimType = "none";
@@ -1152,6 +1167,7 @@ function setPossession(possessed: boolean) {
     isAwakeningShotBall = false;
     awakeningFlightTimer = 0;
     noPlayerCollideTimer = 0;
+    rainbowStageTimer = 0;
     pickupBlend = 0;
     trailMat.color.setHex(0xf8fafc);
   } else {
@@ -1173,6 +1189,7 @@ function resetBall(x = 0, z = 0) {
   activeBallVertSpin = 0;
   isAwakeningShotBall = false;
   awakeningFlightTimer = 0;
+  rainbowStageTimer = 0;
   trailCount = 0;
   trailGeo.setDrawRange(0, 0);
   ballBody.setTranslation({ x, y: 1.2, z }, true);
@@ -1400,7 +1417,6 @@ function fireShot(chargeNorm: number, kickMult: number, curveStrength: number, a
 
   const clampedCharge = Math.max(0.20, Math.min(1.0, chargeNorm));
 
-  // Ultimate Awakening Shot: massive speed, zero air drag, straight flight + wind-gold wake
   if (awakeningShotArmed) {
     awakeningShotArmed = false;
     const awakenSpeed = 58 * activeAwakening().shotPowerMultiplier;
@@ -1539,6 +1555,26 @@ function updateCooldowns(dt: number) {
       ballCollider.setCollisionGroups(BALL_GROUPS_FREE);
     }
   }
+  if (rainbowStageTimer > 0) {
+    rainbowStageTimer -= dt;
+    const pp = playerBody.translation();
+    _fwdVec.set(-Math.sin(playerFacingYaw), 0, -Math.cos(playerFacingYaw)).normalize();
+    const heelX = THREE.MathUtils.clamp(pp.x - _fwdVec.x * 0.36, -hw + BALL_R + 0.1, hw - BALL_R - 0.1);
+    const heelZ = THREE.MathUtils.clamp(pp.z - _fwdVec.z * 0.36, -hd + BALL_R + 0.1, hd - BALL_R - 0.1);
+    if (rainbowStageTimer > 0) {
+      ballBody.setTranslation({ x: heelX, y: 0.36, z: heelZ }, true);
+      ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    } else {
+      rainbowStageTimer = 0;
+      const flickHoriz = 14.2 + pendingFlickFwdVel * 0.25;
+      const flickUp = 11.8;
+      ballBody.setGravityScale(1, true);
+      ballBody.setTranslation({ x: heelX, y: 0.42, z: heelZ }, true);
+      ballBody.setLinvel({ x: _fwdVec.x * flickHoriz, y: flickUp, z: _fwdVec.z * flickHoriz }, true);
+      ballBody.setAngvel({ x: -_fwdVec.z * 16, y: 0, z: _fwdVec.x * 16 }, true);
+      spawnSparkBurst(heelX, 0.38, heelZ, 0xf8fafc, 10, 0.85);
+    }
+  }
   if (kickAnimTimer > 0) kickAnimTimer = Math.max(0, kickAnimTimer - dt);
   if (rainbowFlickTimer > 0) rainbowFlickTimer = Math.max(0, rainbowFlickTimer - dt);
   if (skillAnimTimer > 0) {
@@ -1649,41 +1685,39 @@ const HUD_UPDATE_INTERVAL = 1 / 20;
 let hudAccum = 0;
 const hudDirty = { playstyle: true };
 let prevScore = "", prevStamW = "", prevGaugeVis = "", prevGaugeH = "", prevGaugeColor = "";
-let prevAimVis = "", prevAimX = -999, prevAimY = -999, prevAimAlpha = "";
+let prevAimVis = "", prevAimAlpha = "", prevAimX = -999, prevAimY = -999;
 let prevReticleX = -999, prevReticleY = -999;
 let prevPsText = "", prevAwW = "", prevAwReadyVis = "", prevAwLabelTxt = "";
 
 function updateHUD(dt: number) {
-  const showReticle = isLocked && hasBall;
-  const aimVis = showReticle ? "block" : "none";
+  const showAim = isLocked && hasBall && isCharging;
+  const aimVis = showAim ? "block" : "none";
+  const aimAlpha = showAim ? "1" : "0";
   if (aimVis !== prevAimVis) {
     aimReticle.style.display = aimVis;
     prevAimVis = aimVis;
   }
+  if (aimAlpha !== prevAimAlpha) {
+    aimReticle.style.opacity = aimAlpha;
+    prevAimAlpha = aimAlpha;
+  }
 
-  // Keep compact aiming circle cleanly positioned above the player's head/shoulders
-  if (showReticle) {
+  if (showAim) {
     const pp = playerBody.translation();
     _headScreenVec.set(pp.x, pp.y + 1.48, pp.z).project(camera);
-    const rx = THREE.MathUtils.clamp((_headScreenVec.x * 0.5 + 0.5) * innerWidth, 36, innerWidth - 36);
-    const ry = THREE.MathUtils.clamp((-_headScreenVec.y * 0.5 + 0.5) * innerHeight, 36, innerHeight * 0.45);
+    const rx = THREE.MathUtils.clamp((_headScreenVec.x * 0.5 + 0.5) * innerWidth, 32, innerWidth - 32);
+    const ry = THREE.MathUtils.clamp((-_headScreenVec.y * 0.5 + 0.5) * innerHeight, 32, innerHeight * 0.44);
     if (Math.abs(rx - prevReticleX) > 0.5 || Math.abs(ry - prevReticleY) > 0.5) {
       prevReticleX = rx;
       prevReticleY = ry;
       aimReticle.style.left = `${rx.toFixed(1)}px`;
       aimReticle.style.top  = `${ry.toFixed(1)}px`;
     }
-  }
-
-  const dotAlpha = isCharging ? "1" : "0";
-  if (dotAlpha !== prevAimAlpha) {
-    aimDot.style.opacity = dotAlpha;
-    prevAimAlpha = dotAlpha;
-  }
-  if (showReticle && isCharging && (aimOffsetX !== prevAimX || aimOffsetY !== prevAimY)) {
-    prevAimX = aimOffsetX;
-    prevAimY = aimOffsetY;
-    aimDot.style.transform = `translate(${aimOffsetX.toFixed(1)}px, ${aimOffsetY.toFixed(1)}px)`;
+    if (aimOffsetX !== prevAimX || aimOffsetY !== prevAimY) {
+      prevAimX = aimOffsetX;
+      prevAimY = aimOffsetY;
+      aimDot.style.transform = `translate(${aimOffsetX.toFixed(1)}px, ${aimOffsetY.toFixed(1)}px)`;
+    }
   }
 
   hudAccum += dt;
@@ -1696,13 +1730,12 @@ function updateHUD(dt: number) {
   const stamW = `${stamina.toFixed(1)}%`;
   if (stamW !== prevStamW) { stamBar.style.width = stamW; prevStamW = stamW; }
 
-  const showGauge = isCharging && hasBall && isLocked;
-  const gaugeVis = showGauge ? "flex" : "none";
+  const gaugeVis = showAim ? "flex" : "none";
   if (gaugeVis !== prevGaugeVis) {
     powerGaugeWrap.style.display = gaugeVis;
     prevGaugeVis = gaugeVis;
   }
-  if (showGauge) {
+  if (showAim) {
     const pct = Math.round(shotCharge);
     const gaugeH = `${shotCharge.toFixed(1)}%`;
     const hue = Math.round(125 * (1 - shotCharge / 100));
@@ -1887,38 +1920,33 @@ function applyMagnus(dt: number) {
   activeBallVertSpin *= decay;
 }
 
-// ─── RAINBOW FLICK (SPACEBAR WHILE HOLDING BALL) ────────────────────────────
+// ─── RAINBOW FLICK (BEHIND HEELS 0.08s -> OVER HEAD -> AHEAD) ──────────────
 function performRainbowFlick() {
   const pp = playerBody.translation();
   const pv = playerBody.linvel();
   _fwdVec.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
 
-  const fwdVel = Math.max(0, pv.x * _fwdVec.x + pv.z * _fwdVec.z);
-  const flickHoriz = Math.max(8.5, fwdVel * 0.88 + 5.2);
-  const flickUp = 13.0;
+  pendingFlickFwdVel = Math.max(0, pv.x * _fwdVec.x + pv.z * _fwdVec.z);
 
   setPossession(false);
-  pickupCooldown = 0.4;
-  // Temporarily avoid self-collision with player's own torso/head as ball whips overhead
-  noPlayerCollideTimer = 0.24;
+  pickupCooldown = 0.42;
+  noPlayerCollideTimer = 0.30;
   ballCollider.setCollisionGroups(BALL_GROUPS_POSS);
+  ballBody.setGravityScale(0, true);
 
-  isGrounded = false;
+  rainbowStageTimer = 0.08;
   rainbowFlickTimer = 0.48;
-  activeBallVertSpin = -0.35;
+  isGrounded = false;
+  activeBallSpin = 0;
+  activeBallVertSpin = 0;
 
-  const startX = THREE.MathUtils.clamp(pp.x - _fwdVec.x * 0.32, -hw + BALL_R + 0.1, hw - BALL_R - 0.1);
-  const startZ = THREE.MathUtils.clamp(pp.z - _fwdVec.z * 0.32, -hd + BALL_R + 0.1, hd - BALL_R - 0.1);
-  ballBody.setTranslation({ x: startX, y: 0.44, z: startZ }, true);
-  ballBody.setLinvel({
-    x: _fwdVec.x * flickHoriz,
-    y: flickUp,
-    z: _fwdVec.z * flickHoriz,
-  }, true);
-  ballBody.setAngvel({ x: -_fwdVec.z * 16, y: 0, z: _fwdVec.x * 16 }, true);
+  const heelX = THREE.MathUtils.clamp(pp.x - _fwdVec.x * 0.36, -hw + BALL_R + 0.1, hw - BALL_R - 0.1);
+  const heelZ = THREE.MathUtils.clamp(pp.z - _fwdVec.z * 0.36, -hd + BALL_R + 0.1, hd - BALL_R - 0.1);
+  ballBody.setTranslation({ x: heelX, y: 0.36, z: heelZ }, true);
+  ballBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
 
-  playerBody.applyImpulse({ x: _fwdVec.x * 2.4, y: 3.9, z: _fwdVec.z * 2.4 }, true);
-  spawnSparkBurst(startX, 0.35, startZ, 0xf8fafc, 10, 0.85);
+  // Small snappy hop (~35% of normal jump height) so player stays low & chases the lob
+  playerBody.applyImpulse({ x: _fwdVec.x * 1.9, y: 2.55, z: _fwdVec.z * 1.9 }, true);
   addEnergy(10);
 }
 
@@ -1991,12 +2019,38 @@ function movePlayer(dt: number) {
       performRainbowFlick();
     } else {
       isGrounded = false;
-      playerBody.applyImpulse({ x: 0, y: 4.7, z: 0 }, true);
+      playerBody.applyImpulse({ x: 0, y: 4.5, z: 0 }, true);
     }
   }
 }
 
-// ─── ARTICULATED PLAYER ANIMATION ───────────────────────────────────────────
+// ─── ARTICULATED PLAYER ANIMATION (SMOOTH BLENDED JOINTS) ───────────────────
+function blendJoints(
+  dt: number,
+  tRotX: number, tRotY: number, tRotZ: number, tPosY: number,
+  lHipX: number, lKneeX: number, rHipX: number, rKneeX: number,
+  lShX: number, lShZ: number, lElbX: number,
+  rShX: number, rShZ: number, rElbX: number
+) {
+  const s = 1 - Math.exp(-22 * dt);
+  torsoGroup.rotation.x = THREE.MathUtils.lerp(torsoGroup.rotation.x, tRotX, s);
+  torsoGroup.rotation.y = THREE.MathUtils.lerp(torsoGroup.rotation.y, tRotY, s);
+  torsoGroup.rotation.z = THREE.MathUtils.lerp(torsoGroup.rotation.z, tRotZ, s);
+  torsoGroup.position.y = THREE.MathUtils.lerp(torsoGroup.position.y, tPosY, s);
+
+  leftLeg.hip.rotation.x   = THREE.MathUtils.lerp(leftLeg.hip.rotation.x, lHipX, s);
+  leftLeg.knee.rotation.x  = THREE.MathUtils.lerp(leftLeg.knee.rotation.x, lKneeX, s);
+  rightLeg.hip.rotation.x  = THREE.MathUtils.lerp(rightLeg.hip.rotation.x, rHipX, s);
+  rightLeg.knee.rotation.x = THREE.MathUtils.lerp(rightLeg.knee.rotation.x, rKneeX, s);
+
+  leftArm.shoulder.rotation.x  = THREE.MathUtils.lerp(leftArm.shoulder.rotation.x, lShX, s);
+  leftArm.shoulder.rotation.z  = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, lShZ, s);
+  leftArm.elbow.rotation.x     = THREE.MathUtils.lerp(leftArm.elbow.rotation.x, lElbX, s);
+  rightArm.shoulder.rotation.x = THREE.MathUtils.lerp(rightArm.shoulder.rotation.x, rShX, s);
+  rightArm.shoulder.rotation.z = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, rShZ, s);
+  rightArm.elbow.rotation.x    = THREE.MathUtils.lerp(rightArm.elbow.rotation.x, rElbX, s);
+}
+
 function updatePlayerRig(dt: number, nowSec: number) {
   const pp = playerBody.translation();
   const pv = playerBody.linvel();
@@ -2012,142 +2066,129 @@ function updatePlayerRig(dt: number, nowSec: number) {
   headbandTails[0].rotation.x = 0.55 + normSpeed * 0.55 + flutter;
   headbandTails[1].rotation.x = 0.55 + normSpeed * 0.55 - flutter;
 
-  // 1. Rainbow Flick heel-trap & over-head kick sequence
   if (rainbowFlickTimer > 0) {
     const p = 1 - rainbowFlickTimer / 0.48;
     const whip = Math.sin(Math.min(1, p / 0.65) * Math.PI);
-    torsoGroup.rotation.set(-0.32 * whip, 0, 0);
-    torsoGroup.position.y = 0.92;
-    rightLeg.hip.rotation.x  = -0.68 * whip;
-    rightLeg.knee.rotation.x = -1.78 * whip;
-    leftLeg.hip.rotation.x   = 0.35 * whip;
-    leftLeg.knee.rotation.x  = -0.55 * whip;
-    leftArm.shoulder.rotation.set(0.35 * whip, 0, -0.58 * whip);
-    leftArm.elbow.rotation.x  = 0.5;
-    rightArm.shoulder.rotation.set(0.35 * whip, 0, 0.58 * whip);
-    rightArm.elbow.rotation.x = 0.5;
+    blendJoints(
+      dt,
+      -0.30 * whip, 0, 0, 0.91,
+      0.32 * whip, -0.52 * whip, -0.68 * whip, -1.75 * whip,
+      0.35 * whip, -0.55 * whip, 0.5,
+      0.35 * whip,  0.55 * whip, 0.5
+    );
     return;
   }
 
-  // 2. Dribbling skill animations (Heel Flick, 360 Spin, Fake Shot Feint)
   if (skillAnimTimer > 0 && activeSkillAnim !== "none") {
     if (activeSkillAnim === "heel") {
       const p = 1 - skillAnimTimer / 0.38;
       const snap = Math.sin(p * Math.PI);
-      torsoGroup.rotation.set(-0.35 * snap, 0.3 * snap, 0);
-      rightLeg.hip.rotation.x  = -1.05 * snap;
-      rightLeg.knee.rotation.x = -1.25 * snap;
-      leftArm.shoulder.rotation.set(0.75 * snap, 0, -0.45);
-      rightArm.shoulder.rotation.set(-0.65 * snap, 0, 0.45);
+      blendJoints(
+        dt,
+        -0.32 * snap, 0.28 * snap, 0, 0.90,
+        0.15, -0.25, -1.0 * snap, -1.2 * snap,
+        0.7 * snap, -0.42, 0.55,
+        -0.6 * snap, 0.42, 0.55
+      );
       return;
     }
     if (activeSkillAnim === "spin") {
       const p = 1 - skillAnimTimer / 0.44;
       playerRoot.rotation.y = playerFacingYaw + p * Math.PI * 2;
-      torsoGroup.rotation.set(-0.22, 0, 0);
-      leftArm.shoulder.rotation.set(0.25, 0, -0.78);
-      rightArm.shoulder.rotation.set(0.25, 0, 0.78);
-      leftLeg.hip.rotation.x = 0.35;
-      leftLeg.knee.rotation.x = -0.65;
-      rightLeg.hip.rotation.x = -0.25;
-      rightLeg.knee.rotation.x = -0.45;
+      blendJoints(
+        dt,
+        -0.22, 0, 0, 0.89,
+        0.35, -0.62, -0.25, -0.45,
+        0.25, -0.75, 0.6,
+        0.25,  0.75, 0.6
+      );
       return;
     }
     if (activeSkillAnim === "feint") {
       const p = 1 - skillAnimTimer / 0.40;
       const fake = p < 0.45 ? Math.sin((p / 0.45) * Math.PI) : -Math.sin(((p - 0.45) / 0.55) * Math.PI);
-      torsoGroup.rotation.set(-0.18, fake * 0.45, fake * 0.28);
-      rightLeg.hip.rotation.x = fake * 0.95;
-      rightLeg.knee.rotation.x = -0.45;
-      leftArm.shoulder.rotation.set(-fake * 0.6, 0, -0.55);
-      rightArm.shoulder.rotation.set(fake * 0.6, 0, 0.55);
+      blendJoints(
+        dt,
+        -0.18, fake * 0.45, fake * 0.26, 0.89,
+        -0.15, -0.25, fake * 0.92, -0.42,
+        -fake * 0.58, -0.52, 0.55,
+         fake * 0.58,  0.52, 0.55
+      );
       return;
     }
   }
 
-  // 3. Slide tackle
   if (slideTimer > SLIDE_COOLDOWN - 24) {
-    torsoGroup.rotation.set(0.74, -0.15, 0);
-    torsoGroup.position.y = 0.58;
-    rightLeg.hip.rotation.x  = 1.25;
-    rightLeg.knee.rotation.x = -0.15;
-    leftLeg.hip.rotation.x   = -0.55;
-    leftLeg.knee.rotation.x  = -0.95;
-    leftArm.shoulder.rotation.set(-0.65, 0, -0.35);
-    leftArm.elbow.rotation.x  = 0.45;
-    rightArm.shoulder.rotation.set(0.45, 0, 0.3);
-    rightArm.elbow.rotation.x = 0.75;
+    blendJoints(
+      dt,
+      0.72, -0.15, 0, 0.58,
+      -0.55, -0.95, 1.22, -0.15,
+      -0.62, -0.35, 0.45,
+       0.45,  0.30, 0.72
+    );
     return;
   }
 
-  // 4. Shot follow-through
   if (kickAnimTimer > 0) {
     const p = 1 - kickAnimTimer / 0.28;
     const follow = Math.sin(p * Math.PI);
-    torsoGroup.rotation.set(-0.22 * follow, 0.35 * follow, 0);
-    torsoGroup.position.y = 0.90;
-    rightLeg.hip.rotation.x  = 1.25 * follow;
-    rightLeg.knee.rotation.x = -0.25 * (1 - follow);
-    leftLeg.hip.rotation.x   = -0.25;
-    leftLeg.knee.rotation.x  = -0.22;
-    leftArm.shoulder.rotation.set(0.85 * follow, 0, -0.38);
-    leftArm.elbow.rotation.x  = 0.75;
-    rightArm.shoulder.rotation.set(-0.65 * follow, 0, 0.28);
-    rightArm.elbow.rotation.x = 0.6;
+    blendJoints(
+      dt,
+      -0.22 * follow, 0.34 * follow, 0, 0.90,
+      -0.25, -0.22, 1.22 * follow, -0.22 * (1 - follow),
+       0.82 * follow, -0.36, 0.72,
+      -0.62 * follow,  0.28, 0.58
+    );
     return;
   }
 
-  // 5. Shot charge wind-up
   if (isCharging && hasBall) {
     const c = shotCharge / 100;
-    torsoGroup.rotation.set(0.12 * c, -0.32 * c, 0);
-    torsoGroup.position.y = 0.88 - c * 0.04;
-    rightLeg.hip.rotation.x  = -0.82 * c;
-    rightLeg.knee.rotation.x = -1.05 * c;
-    leftLeg.hip.rotation.x   = 0.18 * c;
-    leftLeg.knee.rotation.x  = -0.22 * c;
-    leftArm.shoulder.rotation.set(0.35 * c, 0, -0.58 * c);
-    leftArm.elbow.rotation.x  = 0.55;
-    rightArm.shoulder.rotation.set(-0.45 * c, 0, 0.35 * c);
-    rightArm.elbow.rotation.x = 0.85;
+    blendJoints(
+      dt,
+      0.12 * c, -0.30 * c, 0, 0.88 - c * 0.04,
+      0.18 * c, -0.22 * c, -0.82 * c, -1.05 * c,
+      0.35 * c, -0.55 * c, 0.55,
+     -0.45 * c,  0.35 * c, 0.82
+    );
     return;
   }
 
-  // 6. Normal airborne
   if (!isGrounded) {
-    torsoGroup.rotation.set(-0.15, 0, 0);
-    torsoGroup.position.y = 0.92;
-    leftLeg.hip.rotation.x   = 0.45;
-    leftLeg.knee.rotation.x  = -0.85;
-    rightLeg.hip.rotation.x  = 0.22;
-    rightLeg.knee.rotation.x = -0.65;
-    leftArm.shoulder.rotation.set(0.45, 0, -0.45);
-    leftArm.elbow.rotation.x  = 0.65;
-    rightArm.shoulder.rotation.set(0.45, 0, 0.45);
-    rightArm.elbow.rotation.x = 0.65;
+    blendJoints(
+      dt,
+      -0.15, 0, 0, 0.92,
+      0.42, -0.82, 0.20, -0.62,
+      0.42, -0.42, 0.62,
+      0.42,  0.42, 0.62
+    );
     return;
   }
 
-  // 7. Procedural Run / Dribble / Idle blending
   if (rigAnimSpeed > 0.3) {
     runCycle += dt * (5.8 + rigAnimSpeed * 0.85);
   }
-  const swing = Math.sin(runCycle) * normSpeed * 0.95;
-
-  leftLeg.hip.rotation.x   =  swing;
-  rightLeg.hip.rotation.x  = -swing;
-  leftLeg.knee.rotation.x  = -Math.max(0, -swing) * 0.85 - normSpeed * 0.12;
-  rightLeg.knee.rotation.x = -Math.max(0,  swing) * 0.85 - normSpeed * 0.12;
-
-  const armSpread = hasBall ? 0.22 : 0.10 + normSpeed * 0.08;
-  leftArm.shoulder.rotation.set(-swing * 0.85, 0, -armSpread);
-  rightArm.shoulder.rotation.set( swing * 0.85, 0,  armSpread);
-  leftArm.elbow.rotation.x  = 0.35 + normSpeed * 0.65 + Math.max(0, -swing) * 0.25;
-  rightArm.elbow.rotation.x = 0.35 + normSpeed * 0.65 + Math.max(0,  swing) * 0.25;
-
+  const swing = Math.sin(runCycle) * normSpeed * 0.92;
+  const armSpread = hasBall ? 0.20 : 0.09 + normSpeed * 0.08;
   const idleBreath = Math.sin(nowSec * 3.0) * 0.02 * (1 - normSpeed);
-  torsoGroup.rotation.set(-normSpeed * (hasBall ? 0.26 : 0.20) + idleBreath, swing * 0.12, 0);
-  torsoGroup.position.y = 0.90 + Math.abs(Math.sin(runCycle)) * 0.045 * normSpeed;
+
+  blendJoints(
+    dt,
+    -normSpeed * (hasBall ? 0.24 : 0.18) + idleBreath,
+    swing * 0.11,
+    0,
+    0.90 + Math.abs(Math.sin(runCycle)) * 0.04 * normSpeed,
+    swing,
+    -Math.max(0, -swing) * 0.85 - normSpeed * 0.10,
+    -swing,
+    -Math.max(0, swing) * 0.85 - normSpeed * 0.10,
+    -swing * 0.85,
+    -armSpread,
+    0.35 + normSpeed * 0.65 + Math.max(0, -swing) * 0.24,
+    swing * 0.85,
+    armSpread,
+    0.35 + normSpeed * 0.65 + Math.max(0, swing) * 0.24
+  );
 }
 
 // ─── CAMERA ─────────────────────────────────────────────────────────────────
